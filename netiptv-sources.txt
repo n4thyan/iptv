@@ -1,0 +1,16 @@
+NET IPTV — 4 SLOT COPY/PASTE PLAN
+
+List 1 — UK
+https://iptv-org.github.io/iptv/countries/uk.m3u
+
+List 2 — Western Europe
+https://iptv-org.github.io/iptv/regions/wer.m3u
+
+List 3 — English-language worldwide
+https://iptv-org.github.io/iptv/languages/eng.m3u
+
+List 4 — Adult / call-in / participation extras
+https://raw.githubusercontent.com/n4thyan/iptv/main/netiptv-extras-adult-callin.m3u
+
+Optional replacement for List 3 if the older Samsung app struggles with the very large English list:
+https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
