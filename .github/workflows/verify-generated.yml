@@ -38,13 +38,32 @@ jobs:
           playlist = Path("english.m3u")
           guide = Path("guide.xml.gz")
           coverage = Path("epg-coverage.txt")
-          stats_path = Path("playlist-stats.json")
+          playlist_stats_path = Path("playlist-stats.json")
+          guide_stats_path = Path("guide-stats.json")
+          chunk_summary = Path("epg-chunk-summary.txt")
+          failures = Path("epg-failures.txt")
           update = Path("last-update.txt")
 
-          required = [playlist, guide, coverage, stats_path, update]
-          missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
+          required = [
+              playlist,
+              guide,
+              coverage,
+              playlist_stats_path,
+              guide_stats_path,
+              chunk_summary,
+              failures,
+              update,
+          ]
+          missing = [str(path) for path in required if not path.is_file()]
           if missing:
-              raise SystemExit(f"missing/empty generated files: {', '.join(missing)}")
+              raise SystemExit(f"missing generated files: {', '.join(missing)}")
+          empty_required = [
+              str(path)
+              for path in [playlist, guide, coverage, playlist_stats_path, guide_stats_path, chunk_summary, update]
+              if path.stat().st_size == 0
+          ]
+          if empty_required:
+              raise SystemExit(f"empty generated files: {', '.join(empty_required)}")
 
           text = playlist.read_text(encoding="utf-8-sig")
           if not text.startswith("#EXTM3U"):
@@ -61,16 +80,29 @@ jobs:
               raise SystemExit(f"guide root is {root.tag!r}, expected 'tv'")
           guide_channels = len(root.findall("channel"))
           programmes = len(root.findall("programme"))
+          programme_channels = {
+              programme.attrib.get("channel", "")
+              for programme in root.findall("programme")
+              if programme.attrib.get("channel")
+          }
           if guide_channels < 1 or programmes < 1:
               raise SystemExit(
                   f"guide has insufficient data: {guide_channels} channels, {programmes} programmes"
               )
 
-          stats = json.loads(stats_path.read_text(encoding="utf-8"))
-          if int(stats.get("entries_kept", 0)) != playlist_channels:
+          playlist_stats = json.loads(playlist_stats_path.read_text(encoding="utf-8"))
+          if int(playlist_stats.get("entries_kept", 0)) != playlist_channels:
               raise SystemExit(
                   "playlist-stats.json entries_kept does not match the generated M3U"
               )
+
+          guide_stats = json.loads(guide_stats_path.read_text(encoding="utf-8"))
+          if int(guide_stats.get("channel_elements", -1)) != guide_channels:
+              raise SystemExit("guide-stats.json channel count does not match guide.xml.gz")
+          if int(guide_stats.get("programme_elements", -1)) != programmes:
+              raise SystemExit("guide-stats.json programme count does not match guide.xml.gz")
+          if int(guide_stats.get("channels_with_programmes", -1)) != len(programme_channels):
+              raise SystemExit("guide-stats.json programme-channel count does not match guide.xml.gz")
 
           coverage_text = coverage.read_text(encoding="utf-8", errors="replace")
           if "matched EPG ids:" not in coverage_text or "UNMATCHED IDS" not in coverage_text:
@@ -78,6 +110,12 @@ jobs:
 
           print(f"playlist_channels={playlist_channels}")
           print(f"guide_channels={guide_channels}")
+          print(f"channels_with_programmes={len(programme_channels)}")
           print(f"programmes={programmes}")
+          print(chunk_summary.read_text(encoding="utf-8").strip())
+          if failures.stat().st_size:
+              print("Some isolated EPG channels failed; see epg-failures.txt")
+          else:
+              print("No isolated EPG channel failures recorded")
           print(update.read_text(encoding="utf-8").strip())
           PY
