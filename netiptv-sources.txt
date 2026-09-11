@@ -16,13 +16,12 @@ UPSTREAM PLAYLIST SOURCES
 Primary — English-language worldwide
 https://iptv-org.github.io/iptv/languages/eng.m3u
 
-UK-only source
+UK-only source (also used to tag the UK group in the full English build)
 https://iptv-org.github.io/iptv/countries/uk.m3u
 
-Western Europe reference
+Western Europe reference only
 https://iptv-org.github.io/iptv/regions/wer.m3u
 
-Optional lighter third-party fallback if needed for testing
-https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8
+The old adult/call-in extras source has been removed because the streams were not working reliably. Adult/NSFW channels are also filtered automatically from generated playlists using IPTV-org metadata plus the conservative fallback filter.
 
-The old adult/call-in extras source has been removed because the streams were not working reliably. The normal Kodi configuration should use the generated URLs above rather than the raw upstream playlist URLs.
+The normal Kodi configuration should use the generated URLs above rather than raw upstream or unrelated third-party playlists. This keeps the source chain understandable and lets the repository apply grouping, filtering and EPG matching consistently.
