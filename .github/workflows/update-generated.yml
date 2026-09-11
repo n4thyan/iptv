@@ -41,7 +41,9 @@ jobs:
         run: python -m unittest discover -s tests -v
 
       - name: Build cleaned English playlist
-        run: python scripts/build_playlist.py
+        run: >-
+          python scripts/build_playlist.py
+          --extra-group UK=https://iptv-org.github.io/iptv/countries/uk.m3u
 
       - name: Build optional cleaned UK playlist
         run: >-
@@ -178,6 +180,7 @@ jobs:
           test -s output/guide-stats.json
           grep -q '^#EXTM3U' output/english.m3u
           grep -q '^#EXTM3U' output/uk.m3u
+          grep -q 'group-title="[^"]*UK' output/english.m3u
           grep -q '<tv' output/guide.xml
           grep -q '<programme ' output/guide.xml
           echo "english_playlist_bytes=$(wc -c < output/english.m3u)"

@@ -18,8 +18,18 @@ Kodi-facing files are published from the `generated` branch:
 - EPG coverage report: `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-coverage.txt`
 - EPG generation stats: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide-stats.json`
 - Playlist build stats: `https://raw.githubusercontent.com/n4thyan/iptv/generated/playlist-stats.json`
+- EPG batch/retry summary: `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-chunk-summary.txt`
+- Last successful generation time: `https://raw.githubusercontent.com/n4thyan/iptv/generated/last-update.txt`
 
 Both generated M3Us embed the same EPG URL in their `x-tvg-url` header for clients that support it.
+
+## Automatic UK group
+
+The full `english.m3u` keeps all of IPTV-org's normal category groups, but the build also compares it with IPTV-org's UK country playlist and appends a `UK` group to matching channels.
+
+That means Kodi can expose a real **UK** PVR group while still keeping the full worldwide English list. You do **not** need a second IPTV Simple configuration just to get UK channels, so there is no reason to duplicate those channels in `All channels`.
+
+The smaller `uk.m3u` still exists for devices where you want only the UK list.
 
 ## What the automatic build does
 
@@ -27,18 +37,19 @@ The GitHub Actions workflow:
 
 1. downloads the current English and UK IPTV-org playlists,
 2. removes adult/NSFW entries using IPTV-org channel metadata plus a conservative fallback filter,
-3. preserves `tvg-id`, logos, channel groups, stream URLs and Kodi/VLC stream directives,
-4. scans IPTV-org's EPG definitions for matching channel IDs,
-5. uses same-channel feed aliases when appropriate to improve coverage,
-6. splits the large EPG job into small memory-safe batches,
-7. retries any failed batch channel-by-channel so one bad upstream source does not discard the other good channels in that batch,
-8. downloads programme data for two days,
-9. merges the successful XMLTV fragments and produces guide statistics,
-10. validates and publishes the finished files to the `generated` branch.
+3. preserves `tvg-id`, logos, existing channel groups, stream URLs and Kodi/VLC stream directives,
+4. tags English-playlist entries that also exist in the UK country feed with the extra `UK` group,
+5. scans IPTV-org's EPG definitions for matching channel IDs,
+6. uses same-channel feed aliases when appropriate to improve coverage,
+7. splits the large EPG job into small memory-safe batches,
+8. retries any failed batch channel-by-channel so one bad upstream source does not discard the other good channels in that batch,
+9. downloads programme data for two days,
+10. merges the successful XMLTV fragments and produces guide statistics,
+11. validates and publishes the finished files to the `generated` branch.
 
-A second Actions workflow verifies the published branch after a successful generation run by reopening the compressed XMLTV guide, checking both playlists and cross-checking their generated statistics.
+A second Actions workflow verifies the published branch after a successful generation run by reopening the compressed XMLTV guide, checking both playlists, verifying the generated UK group and cross-checking the generated statistics.
 
-The generation workflow runs daily and can also be started manually.
+The generation workflow runs daily and can also be started manually. A failed generation does not overwrite the last good `generated` branch because publishing only happens after the validation steps pass.
 
 ## EPG coverage
 
@@ -50,7 +61,7 @@ If an EPG source crashes or exhausts memory, the build records the isolated fail
 
 `XMLTV/xmltv` is also useful and is documented as a possible second-stage toolkit for filtering, merging or augmenting listings if we need to push coverage further.
 
-See [`docs/EPG.md`](docs/EPG.md) for the architecture and Kodi setup notes.
+See [`docs/EPG.md`](docs/EPG.md) for the architecture and [`docs/KODI_SETUP.md`](docs/KODI_SETUP.md) for the Xbox setup.
 
 ## Adult channels
 
@@ -87,9 +98,11 @@ Kodi on Xbox uses **PVR IPTV Simple Client**. The normal configuration is:
 - **M3U playlist URL** → generated `english.m3u`
 - **XMLTV URL** → generated `guide.xml.gz`
 
+After import, the source categories remain available and the generated **UK** group should appear alongside them. Favourites can then be managed in Kodi without editing the generated files.
+
 If the full worldwide list feels too large, switch only the M3U URL to generated `uk.m3u`; it uses the same guide URL.
 
-After that Kodi can handle the normal TV guide, channel groups, favourites and the eventual Sky-style skin without requiring a PC to remain switched on.
+The PC is not required for normal playback or EPG use. It is only needed for development and optional local stream-health audits.
 
 ## Project philosophy
 
