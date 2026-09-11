@@ -6,13 +6,14 @@ These steps are for the generated playlist/EPG, not the raw upstream URLs.
 
 You do **not** need to type the long GitHub URLs with the Xbox controller.
 
-Use [`PC_TO_KODI.md`](PC_TO_KODI.md):
+Use [`PC_TO_KODI.md`](PC_TO_KODI.md). The easiest Windows flow is:
 
-1. create the temporary Windows SMB transfer share with `tools/prepare-kodi-transfer.ps1`;
-2. copy the active IPTV Simple `instance-settings-*.xml` file from Kodi to the PC;
+1. double-click `tools\start-kodi-transfer.cmd` and accept the UAC prompt;
+2. copy the active IPTV Simple `instance-settings-*.xml` file from Kodi to the temporary PC share;
 3. patch the M3U and XMLTV URLs on the PC with `tools/patch-iptvsimple-settings.ps1`;
 4. copy the same XML file back to Kodi;
-5. fully restart Kodi.
+5. fully restart Kodi;
+6. when finished, double-click `tools\stop-kodi-transfer.cmd` to remove the temporary share.
 
 The saved URLs still point at GitHub, so the PC can be switched off afterwards.
 
@@ -112,7 +113,7 @@ The same temporary SMB path can be used later for:
 4. exporting Kodi config files for editing on the PC,
 5. restoring known-good files after testing.
 
-Remove the temporary share when finished with:
+Remove the temporary share when finished with `tools\stop-kodi-transfer.cmd`, or from elevated PowerShell with:
 
 ```powershell
 .\tools\prepare-kodi-transfer.ps1 -RemoveShare
