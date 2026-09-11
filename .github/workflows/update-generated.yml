@@ -21,7 +21,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 350
+    timeout-minutes: 180
 
     steps:
       - name: Check out project
@@ -92,9 +92,11 @@ jobs:
           --label primary
           --chunk-size 20
           --days 2
-          --max-connections 4
-          --retry-connections 2
-          --timeout-ms 20000
+          --max-connections 8
+          --retry-connections 1
+          --retry-workers 6
+          --timeout-ms 12000
+          --retry-timeout-ms 8000
 
       - name: Merge primary guide
         run: >-
@@ -125,9 +127,11 @@ jobs:
           --label fallback1
           --chunk-size 15
           --days 2
-          --max-connections 3
+          --max-connections 6
           --retry-connections 1
-          --timeout-ms 20000
+          --retry-workers 6
+          --timeout-ms 12000
+          --retry-timeout-ms 8000
           --allow-empty
 
       - name: Merge guide after first fallback
@@ -160,9 +164,11 @@ jobs:
           --label fallback2
           --chunk-size 10
           --days 2
-          --max-connections 2
+          --max-connections 4
           --retry-connections 1
-          --timeout-ms 20000
+          --retry-workers 6
+          --timeout-ms 12000
+          --retry-timeout-ms 8000
           --allow-empty
 
       - name: Merge final programme guide
