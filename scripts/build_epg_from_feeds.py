@@ -4,7 +4,7 @@
 EPG providers and IPTV-org often describe the same channel with different ID
 punctuation (for example ``Channel.4.HD.uk`` vs ``Channel4.uk@UKHD``).  This
 builder first honours exact IDs, then uses a deliberately conservative,
-country-aware compatibility key.  Compatible source rows are rewritten to the
+country-aware compatibility key. Compatible source rows are rewritten to the
 *exact* IPTV-org tvg-id values used by the playlist so Kodi can join the guide
 without manual channel mapping.
 """
@@ -24,9 +24,28 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
 
-USER_AGENT = "Kodi-IPTV-EPG-Builder/2.1"
+USER_AGENT = "Kodi-IPTV-EPG-Builder/2.2"
 QUALITY_SUFFIXES = ("uhd", "fhd", "hd", "sd")
 NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+
+# Common UK regional abbreviations used by EPGShare. These are deliberately
+# explicit rather than fuzzy so a regional schedule cannot silently jump to a
+# different region.
+FEED_ALIASES: dict[str, set[str]] = {
+    "channelislands": {"channelislands", "ci"},
+    "eastmidlands": {"eastmidlands", "eastmid", "emidlands", "emid"},
+    "london": {"london", "lon"},
+    "northeastcumbria": {"northeastcumbria", "necumbria", "neandc"},
+    "northernireland": {"northernireland", "ni"},
+    "northwest": {"northwest", "nwest"},
+    "scotland": {"scotland", "scot"},
+    "southeast": {"southeast", "seast"},
+    "south": {"south", "sth"},
+    "southwest": {"southwest", "swest"},
+    "wales": {"wales", "wal"},
+    "westmidlands": {"westmidlands", "wm"},
+    "yorkshire": {"yorkshire", "yorks", "yandl"},
+}
 
 
 def local_name(tag: str) -> str:
@@ -97,18 +116,22 @@ def split_country_id(identifier: str) -> tuple[str, str] | None:
     return stem, country
 
 
+def strip_quality_suffix(value: str) -> str:
+    for suffix in QUALITY_SUFFIXES:
+        if value.endswith(suffix) and len(value) > len(suffix) + 2:
+            return value[: -len(suffix)]
+    return value
+
+
 def normalized_stems(stem: str) -> list[str]:
     """Create conservative punctuation/quality variants for an ID stem."""
     normalized = NON_ALNUM_RE.sub("", stem.casefold())
     if not normalized:
         return []
     values = [normalized]
-    for suffix in QUALITY_SUFFIXES:
-        if normalized.endswith(suffix) and len(normalized) > len(suffix) + 2:
-            stripped = normalized[: -len(suffix)]
-            if stripped and stripped not in values:
-                values.append(stripped)
-            break
+    stripped = strip_quality_suffix(normalized)
+    if stripped and stripped not in values:
+        values.append(stripped)
     return values
 
 
@@ -120,15 +143,41 @@ def compatibility_keys(identifier: str) -> list[tuple[str, str]]:
     return [(country, value) for value in normalized_stems(stem)]
 
 
+def feed_variants(identifier: str) -> list[str]:
+    if "@" not in identifier:
+        return []
+    feed = NON_ALNUM_RE.sub("", identifier.split("@", 1)[1].casefold())
+    if not feed:
+        return []
+    canonical = strip_quality_suffix(feed)
+    values = {feed, canonical}
+    values.update(FEED_ALIASES.get(canonical, set()))
+    return sorted(value for value in values if value)
+
+
 def build_target_index(
     requested_ids: set[str],
 ) -> dict[tuple[str, str], dict[str, set[str]]]:
-    """Index compatibility keys while retaining base-ID collision information."""
+    """Index base and feed-specific keys while retaining collision information."""
     index: dict[tuple[str, str], dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
     for target_id in requested_ids:
         base_id = playlist_base_id(target_id)
-        for key in compatibility_keys(target_id):
-            index[key][base_id].add(target_id)
+        parts = split_country_id(target_id)
+        if parts is None:
+            continue
+        stem, country = parts
+        base_stems = normalized_stems(stem)
+
+        # Base-level mapping handles ordinary quality differences, such as
+        # Channel.4.HD.uk -> Channel4.uk@UKHD.
+        for base_stem in base_stems:
+            index[(country, base_stem)][base_id].add(target_id)
+
+        # Feed-specific keys handle regional sources such as
+        # BBC.One.Lon.HD.uk -> BBCOne.uk@London/ LondonHD.
+        primary_base = base_stems[-1]
+        for feed in feed_variants(target_id):
+            index[(country, primary_base + feed)][base_id].add(target_id)
     return index
 
 
@@ -144,7 +193,7 @@ def targets_for_source_id(
     for key in compatibility_keys(source_id):
         base_groups = target_index.get(key, {})
         # Multiple different IPTV-org base channels collapsing to one key is
-        # ambiguous.  Feed variants of the same base channel are safe to clone.
+        # ambiguous. Feed variants of the same base channel are safe to clone.
         if len(base_groups) != 1:
             continue
         targets = next(iter(base_groups.values()))
@@ -180,8 +229,6 @@ def parse_source(
     compatible_source_channels: set[str] = set()
     unmatched_source_channels: set[str] = set()
     opener = gzip.open if path.suffix.casefold() == ".gz" else open
-
-    # Cache source-ID resolution because every programme row repeats the same ID.
     resolved: dict[str, tuple[list[str], str]] = {}
 
     def resolve(source_id: str) -> tuple[list[str], str]:
