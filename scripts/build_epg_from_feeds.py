@@ -24,7 +24,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
 
-USER_AGENT = "Kodi-IPTV-EPG-Builder/2.3"
+USER_AGENT = "Kodi-IPTV-EPG-Builder/2.4"
 QUALITY_SUFFIXES = ("uhd", "fhd", "hd", "sd")
 NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 
@@ -32,6 +32,8 @@ NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 # instead of using a plain ISO country code. Normalize only explicit known
 # aliases so the matcher remains country-safe rather than broadly fuzzy.
 COUNTRY_ALIASES = {
+    "ca1": "ca",
+    "ca2": "ca",
     "us1": "us",
     "us2": "us",
     "uslocals1": "us",

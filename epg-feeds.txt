@@ -9,6 +9,7 @@ https://epgshare01.online/epgshare01/epg_ripper_IE1.xml.gz
 https://epgshare01.online/epgshare01/epg_ripper_US2.xml.gz
 https://epgshare01.online/epgshare01/epg_ripper_US_LOCALS1.xml.gz
 https://epgshare01.online/epgshare01/epg_ripper_US_SPORTS1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_CA2.xml.gz
 https://epgshare01.online/epgshare01/epg_ripper_AU1.xml.gz
 https://epgshare01.online/epgshare01/epg_ripper_NZ1.xml.gz
 https://epgshare01.online/epgshare01/epg_ripper_ZA1.xml.gz

@@ -30,6 +30,14 @@ class FastEpgBuilderTests(unittest.TestCase):
         self.assertEqual(mode, "unmatched")
         self.assertEqual(targets, [])
 
+    def test_ca2_dataset_suffix_maps_to_ca_playlist_namespace(self):
+        requested = {"CBCNewsNetwork.ca", "CTVNewsChannel.ca"}
+        index = mod.build_target_index(requested)
+        targets, mode = mod.targets_for_source_id("CBC.News.Network.HD.ca2", requested, index)
+        self.assertEqual(mode, "compatible")
+        self.assertEqual(targets, ["CBCNewsNetwork.ca"])
+        self.assertEqual(mod.split_country_id("CTV.News.Channel.HD.ca2")[1], "ca")
+
     def test_us2_dataset_suffix_maps_to_us_playlist_namespace(self):
         requested = {"BBCNews.us", "CNBC.us"}
         index = mod.build_target_index(requested)
