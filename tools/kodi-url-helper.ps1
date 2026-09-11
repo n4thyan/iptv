@@ -17,17 +17,21 @@ if (-not $KodiIp) {
 
 Write-Host ""
 Write-Host "Choose what to type into the CURRENT Kodi text box:"
-Write-Host "  1  Full English generated M3U (recommended)"
+Write-Host "  1  Curated English M3U (recommended)"
 Write-Host "  2  Generated XMLTV EPG"
-Write-Host "  3  UK-only generated M3U"
-Write-Host "  4  Custom text"
+Write-Host "  3  Curated UK-only M3U"
+Write-Host "  4  Full English M3U"
+Write-Host "  5  Full UK-only M3U"
+Write-Host "  6  Custom text"
 $choice = Read-Host "Choice"
 
 switch ($choice) {
-    "1" { $text = "https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u" }
+    "1" { $text = "https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u" }
     "2" { $text = "https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz" }
-    "3" { $text = "https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u" }
-    "4" { $text = Read-Host "Text to send" }
+    "3" { $text = "https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u" }
+    "4" { $text = "https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u" }
+    "5" { $text = "https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u" }
+    "6" { $text = Read-Host "Text to send" }
     default { throw "Unknown choice: $choice" }
 }
 
