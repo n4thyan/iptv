@@ -102,7 +102,7 @@ https://cdn.example.com/live.m3u8
         self.assertEqual(result2.consecutive_failures, 3)
         self.assertTrue(result2.drop)
 
-    def test_access_restriction_does_not_increment_failure_count(self):
+    def test_access_restriction_breaks_failure_streak(self):
         result = mod.ProbeResult(
             key="Example.uk\thttps://example.com/live.m3u8",
             name="Example",
@@ -115,7 +115,23 @@ https://cdn.example.com/live.m3u8
         )
         previous = {result.key: {"consecutive_failures": 2}}
         mod.apply_history(result, previous, drop_after=3)
-        self.assertEqual(result.consecutive_failures, 2)
+        self.assertEqual(result.consecutive_failures, 0)
+        self.assertFalse(result.drop)
+
+    def test_untested_scraper_entry_breaks_failure_streak(self):
+        result = mod.ProbeResult(
+            key="Example.uk\t@plugin-entry",
+            name="Example",
+            tvg_id="Example.uk",
+            url="@plugin-entry",
+            status="untested",
+            detail="Kodi web-scraper entry",
+            attempts=1,
+            elapsed_seconds=0.0,
+        )
+        previous = {result.key: {"consecutive_failures": 2}}
+        mod.apply_history(result, previous, drop_after=3)
+        self.assertEqual(result.consecutive_failures, 0)
         self.assertFalse(result.drop)
 
 
