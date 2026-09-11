@@ -270,7 +270,7 @@ def probe_entry(entry: Entry, timeout: float, attempts: int, retry_delay: float)
     final_status, final_detail, _ = statuses[-1]
 
     # Only call an endpoint dead within one run when every attempt returned a
-    # hard not-found/gone signal. Everything else needs history across runs.
+    # hard not-found/gone signal. Even then, history is required before removal.
     if final_status == "dead" and any(item[0] != "dead" for item in statuses):
         final_status = "temporary_failed"
         final_detail = "mixed probe failures; retained"
@@ -315,8 +315,11 @@ def apply_history(
     else:
         result.consecutive_failures = old_failures + 1
 
-    result.drop = result.status == "dead" or (
-        result.status == "temporary_failed" and result.consecutive_failures >= drop_after
+    # Never remove a stream after one validation run, even for a hard 404/410.
+    # Public IPTV endpoints can be briefly stale, rotated or rate-limited.
+    result.drop = (
+        result.status in {"dead", "temporary_failed"}
+        and result.consecutive_failures >= drop_after
     )
     return result
 
@@ -338,7 +341,7 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=8.0)
     parser.add_argument("--attempts", type=int, default=2)
     parser.add_argument("--retry-delay", type=float, default=1.5)
-    parser.add_argument("--drop-after", type=int, default=3, help="consecutive non-hard-failure runs before removal")
+    parser.add_argument("--drop-after", type=int, default=3, help="consecutive failed validation runs before removal")
     parser.add_argument("--state", default="output/stream-health.json")
     parser.add_argument("--cleaned", default="output/english-validated.m3u")
     parser.add_argument("--report", default="output/stream-health-summary.json")
@@ -412,7 +415,7 @@ def main() -> int:
         "drop_after_consecutive_failures": args.drop_after,
         "attempts_per_run": args.attempts,
         "timeout_seconds": args.timeout,
-        "note": "access_restricted and untested streams are retained automatically",
+        "note": "all removals require repeated failed validation runs; access_restricted and untested streams are retained",
     }
     Path(args.report).parent.mkdir(parents=True, exist_ok=True)
     Path(args.report).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
