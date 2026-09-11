@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "scripts/**"
+      - "epg-feeds.txt"
       - ".github/workflows/update-generated.yml"
   schedule:
     - cron: "17 4 * * *"
@@ -21,7 +22,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 30
 
     steps:
       - name: Check out project
@@ -32,11 +33,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-
       - name: Run Python regression tests
         run: python -m unittest discover -s tests -v
 
@@ -45,7 +41,7 @@ jobs:
           python scripts/build_playlist.py
           --extra-group UK=https://iptv-org.github.io/iptv/countries/uk.m3u
 
-      - name: Build optional cleaned UK playlist
+      - name: Build cleaned UK playlist
         run: >-
           python scripts/build_playlist.py
           --source https://iptv-org.github.io/iptv/countries/uk.m3u
@@ -53,153 +49,33 @@ jobs:
           --ids output/uk-channel_ids.txt
           --stats output/uk-playlist-stats.json
 
-      - name: Build playlist channel metadata catalog
+      - name: Build fast exact-ID XMLTV guide
         run: >-
-          python scripts/build_channel_catalog.py
-          --playlist output/english.m3u
-          --output output/channel-catalog.json
-
-      - name: Check out IPTV-org EPG tooling
-        run: git clone --depth 1 --branch master https://github.com/iptv-org/epg.git vendor/epg
-
-      - name: Install EPG grabber dependencies
-        working-directory: vendor/epg
-        env:
-          HUSKY: "0"
-        run: npm ci
-
-      - name: Match playlist IDs to EPG sources
-        run: >-
-          python scripts/build_epg_channels.py
+          python scripts/build_epg_from_feeds.py
           --ids output/channel_ids.txt
-          --sites-root vendor/epg/sites
-          --catalog output/channel-catalog.json
-          --output output/epg.channels.xml
-          --coverage output/epg-coverage.txt
-          --candidates output/epg-candidates.json
-
-      - name: Grab primary programme guide
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-        run: >-
-          python scripts/grab_epg_batches.py
-          --channels output/epg.channels.xml
-          --epg-root vendor/epg
-          --output-dir output/epg-fragments-primary
-          --work-dir output/epg-work-primary
-          --summary output/epg-primary-summary.json
-          --failures output/epg-primary-failures.txt
-          --label primary
-          --chunk-size 20
-          --days 2
-          --max-connections 8
-          --retry-connections 1
-          --retry-workers 6
-          --timeout-ms 12000
-          --retry-timeout-ms 8000
-
-      - name: Merge primary guide
-        run: >-
-          python scripts/merge_xmltv.py
-          "output/epg-fragments-primary/*.xml"
-          --output output/guide-primary.xml
-
-      - name: Select first alternate EPG sources
-        run: >-
-          python scripts/build_epg_fallback_channels.py
-          --candidates output/epg-candidates.json
-          --guide output/guide-primary.xml
-          --candidate-index 1
-          --output output/epg-fallback1.channels.xml
-          --stats output/epg-fallback1-selection.json
-
-      - name: Grab first alternate EPG pass
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-        run: >-
-          python scripts/grab_epg_batches.py
-          --channels output/epg-fallback1.channels.xml
-          --epg-root vendor/epg
-          --output-dir output/epg-fragments-fallback1
-          --work-dir output/epg-work-fallback1
-          --summary output/epg-fallback1-summary.json
-          --failures output/epg-fallback1-failures.txt
-          --label fallback1
-          --chunk-size 15
-          --days 2
-          --max-connections 6
-          --retry-connections 1
-          --retry-workers 6
-          --timeout-ms 12000
-          --retry-timeout-ms 8000
-          --allow-empty
-
-      - name: Merge guide after first fallback
-        run: >-
-          python scripts/merge_xmltv.py
-          "output/epg-fragments-primary/*.xml"
-          "output/epg-fragments-fallback1/*.xml"
-          --output output/guide-round1.xml
-
-      - name: Select second alternate EPG sources
-        run: >-
-          python scripts/build_epg_fallback_channels.py
-          --candidates output/epg-candidates.json
-          --guide output/guide-round1.xml
-          --candidate-index 2
-          --output output/epg-fallback2.channels.xml
-          --stats output/epg-fallback2-selection.json
-
-      - name: Grab second alternate EPG pass
-        env:
-          NODE_OPTIONS: "--max-old-space-size=4096"
-        run: >-
-          python scripts/grab_epg_batches.py
-          --channels output/epg-fallback2.channels.xml
-          --epg-root vendor/epg
-          --output-dir output/epg-fragments-fallback2
-          --work-dir output/epg-work-fallback2
-          --summary output/epg-fallback2-summary.json
-          --failures output/epg-fallback2-failures.txt
-          --label fallback2
-          --chunk-size 10
-          --days 2
-          --max-connections 4
-          --retry-connections 1
-          --retry-workers 6
-          --timeout-ms 12000
-          --retry-timeout-ms 8000
-          --allow-empty
-
-      - name: Merge final programme guide
-        run: >-
-          python scripts/merge_xmltv.py
-          "output/epg-fragments-primary/*.xml"
-          "output/epg-fragments-fallback1/*.xml"
-          "output/epg-fragments-fallback2/*.xml"
+          --sources-file epg-feeds.txt
           --output output/guide.xml
+          --stats output/guide-stats.json
+          --coverage output/epg-coverage.txt
+          --failures output/epg-failures.txt
+          --download-workers 6
+          --download-timeout 90
 
-      - name: Summarize EPG passes
-        run: |
-          cat output/epg-primary-summary.json > output/epg-chunk-summary.txt
-          printf '\n--- fallback1 selection ---\n' >> output/epg-chunk-summary.txt
-          cat output/epg-fallback1-selection.json >> output/epg-chunk-summary.txt
-          printf '\n--- fallback1 grab ---\n' >> output/epg-chunk-summary.txt
-          cat output/epg-fallback1-summary.json >> output/epg-chunk-summary.txt
-          printf '\n--- fallback2 selection ---\n' >> output/epg-chunk-summary.txt
-          cat output/epg-fallback2-selection.json >> output/epg-chunk-summary.txt
-          printf '\n--- fallback2 grab ---\n' >> output/epg-chunk-summary.txt
-          cat output/epg-fallback2-summary.json >> output/epg-chunk-summary.txt
-          cat output/epg-primary-failures.txt \
-              output/epg-fallback1-failures.txt \
-              output/epg-fallback2-failures.txt \
-              > output/epg-failures.txt
-
-      - name: Summarize programme guide
+      - name: Build curated playlist with real EPG coverage
         run: >-
-          python scripts/xmltv_stats.py
-          output/guide.xml
-          --output output/guide-stats.json
+          python scripts/filter_playlist_by_epg.py
+          --playlist output/english.m3u
+          --guide output/guide.xml
+          --output output/curated.m3u
+          --stats output/curated-playlist-stats.json
+
+      - name: Build curated UK playlist with real EPG coverage
+        run: >-
+          python scripts/filter_playlist_by_epg.py
+          --playlist output/uk.m3u
+          --guide output/guide.xml
+          --output output/curated-uk.m3u
+          --stats output/curated-uk-playlist-stats.json
 
       - name: Compress guide
         run: gzip -9 -c output/guide.xml > output/guide.xml.gz
@@ -208,35 +84,48 @@ jobs:
         run: |
           test -s output/english.m3u
           test -s output/uk.m3u
+          test -s output/curated.m3u
+          test -s output/curated-uk.m3u
           test -s output/guide.xml.gz
           test -s output/guide-stats.json
-          test -s output/epg-candidates.json
+          test -s output/epg-coverage.txt
           grep -q '^#EXTM3U' output/english.m3u
-          grep -q '^#EXTM3U' output/uk.m3u
+          grep -q '^#EXTM3U' output/curated.m3u
           grep -q 'group-title="[^"]*UK' output/english.m3u
-          grep -q '<tv' output/guide.xml
           grep -q '<programme ' output/guide.xml
-          echo "english_playlist_bytes=$(wc -c < output/english.m3u)"
-          echo "uk_playlist_bytes=$(wc -c < output/uk.m3u)"
-          echo "guide_xml_bytes=$(wc -c < output/guide.xml)"
-          echo "guide_gzip_bytes=$(wc -c < output/guide.xml.gz)"
-          echo "programmes=$(grep -c '<programme ' output/guide.xml || true)"
-          cat output/guide-stats.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          guide = json.loads(Path('output/guide-stats.json').read_text())
+          curated = json.loads(Path('output/curated-playlist-stats.json').read_text())
+          curated_uk = json.loads(Path('output/curated-uk-playlist-stats.json').read_text())
+          if int(guide.get('channels_with_programmes', 0)) < 50:
+              raise SystemExit(f"EPG coverage too low: {guide}")
+          if int(curated.get('entries_kept', 0)) < 50:
+              raise SystemExit(f"curated playlist too small: {curated}")
+          if int(curated_uk.get('entries_kept', 0)) < 5:
+              raise SystemExit(f"curated UK playlist too small: {curated_uk}")
+          print(json.dumps(guide, indent=2))
+          print(json.dumps(curated, indent=2))
+          print(json.dumps(curated_uk, indent=2))
+          PY
 
       - name: Prepare generated branch
         run: |
           mkdir -p publish
           cp output/english.m3u publish/english.m3u
           cp output/uk.m3u publish/uk.m3u
+          cp output/curated.m3u publish/curated.m3u
+          cp output/curated-uk.m3u publish/curated-uk.m3u
           cp output/guide.xml.gz publish/guide.xml.gz
           cp output/guide-stats.json publish/guide-stats.json
           cp output/epg-coverage.txt publish/epg-coverage.txt
+          cp output/epg-failures.txt publish/epg-failures.txt
           cp output/playlist-stats.json publish/playlist-stats.json
           cp output/uk-playlist-stats.json publish/uk-playlist-stats.json
-          cp output/epg-chunk-summary.txt publish/epg-chunk-summary.txt
-          cp output/epg-failures.txt publish/epg-failures.txt
-          cp output/epg-fallback1-selection.json publish/epg-fallback1-selection.json
-          cp output/epg-fallback2-selection.json publish/epg-fallback2-selection.json
+          cp output/curated-playlist-stats.json publish/curated-playlist-stats.json
+          cp output/curated-uk-playlist-stats.json publish/curated-uk-playlist-stats.json
           printf 'Generated: %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > publish/last-update.txt
 
       - name: Publish generated files
@@ -249,6 +138,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Refresh Kodi playlist and EPG"
+          git commit -m "Refresh Kodi playlist and fast EPG"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin generated
