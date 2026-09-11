@@ -8,7 +8,6 @@ on:
     paths:
       - "scripts/**"
       - ".github/workflows/update-generated.yml"
-      - "README.md"
   schedule:
     - cron: "17 4 * * *"
 
@@ -38,6 +37,9 @@ jobs:
         with:
           node-version: "22"
 
+      - name: Run Python regression tests
+        run: python -m unittest discover -s tests -v
+
       - name: Build cleaned English playlist
         run: python scripts/build_playlist.py
 
@@ -58,18 +60,79 @@ jobs:
           --output output/epg.channels.xml
           --coverage output/epg-coverage.txt
 
-      - name: Grab programme guide
-        working-directory: vendor/epg
+      - name: Split EPG request into memory-safe chunks
         run: >-
-          npm run grab --
-          --channels="${{ github.workspace }}/output/epg.channels.xml"
-          --output="${{ github.workspace }}/output/guide.xml"
-          --days=2
-          --maxConnections=8
-          --timeout=20000
+          python scripts/split_epg_channels.py
+          --input output/epg.channels.xml
+          --output-dir output/epg-chunks
+          --size 60
+          --manifest output/epg-chunks.json
+
+      - name: Grab programme guide chunks
+        working-directory: vendor/epg
+        env:
+          NODE_OPTIONS: "--max-old-space-size=3072"
+        run: |
+          set -u
+          mkdir -p "$GITHUB_WORKSPACE/output/epg-fragments"
+          : > "$GITHUB_WORKSPACE/output/epg-failures.txt"
+
+          success=0
+          failed=0
+
+          for channels in "$GITHUB_WORKSPACE"/output/epg-chunks/chunk-*.channels.xml; do
+            chunk="$(basename "$channels" .channels.xml)"
+            output="$GITHUB_WORKSPACE/output/epg-fragments/${chunk}.xml"
+            echo "=== ${chunk} ==="
+
+            set +e
+            npm run grab -- \
+              --channels="$channels" \
+              --output="$output" \
+              --days=2 \
+              --maxConnections=6 \
+              --timeout=20000
+            status=$?
+            set -e
+
+            if [ "$status" -eq 0 ] && [ -s "$output" ]; then
+              success=$((success + 1))
+            else
+              failed=$((failed + 1))
+              rm -f "$output"
+              printf '%s\texit=%s\n' "$chunk" "$status" >> "$GITHUB_WORKSPACE/output/epg-failures.txt"
+            fi
+          done
+
+          printf 'successful_chunks=%s\nfailed_chunks=%s\n' "$success" "$failed" \
+            > "$GITHUB_WORKSPACE/output/epg-chunk-summary.txt"
+
+          echo "EPG chunks: ${success} successful, ${failed} failed"
+          if [ "$success" -eq 0 ]; then
+            echo "No EPG chunks were generated successfully."
+            exit 1
+          fi
+
+      - name: Merge programme guide chunks
+        run: >-
+          python scripts/merge_xmltv.py
+          "output/epg-fragments/chunk-*.xml"
+          --output output/guide.xml
 
       - name: Compress guide
         run: gzip -9 -c output/guide.xml > output/guide.xml.gz
+
+      - name: Validate generated outputs
+        run: |
+          test -s output/english.m3u
+          test -s output/guide.xml.gz
+          grep -q '^#EXTM3U' output/english.m3u
+          grep -q '<tv' output/guide.xml
+          grep -q '<programme ' output/guide.xml
+          echo "playlist_bytes=$(wc -c < output/english.m3u)"
+          echo "guide_xml_bytes=$(wc -c < output/guide.xml)"
+          echo "guide_gzip_bytes=$(wc -c < output/guide.xml.gz)"
+          echo "programmes=$(grep -c '<programme ' output/guide.xml || true)"
 
       - name: Prepare generated branch
         run: |
@@ -78,6 +141,8 @@ jobs:
           cp output/guide.xml.gz publish/guide.xml.gz
           cp output/epg-coverage.txt publish/epg-coverage.txt
           cp output/playlist-stats.json publish/playlist-stats.json
+          cp output/epg-chunk-summary.txt publish/epg-chunk-summary.txt
+          cp output/epg-failures.txt publish/epg-failures.txt
           printf 'Generated: %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > publish/last-update.txt
 
       - name: Publish generated files
