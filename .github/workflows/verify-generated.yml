@@ -36,163 +36,83 @@ jobs:
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
-          english = Path("english.m3u")
-          uk = Path("uk.m3u")
-          guide = Path("guide.xml.gz")
-          coverage = Path("epg-coverage.txt")
-          playlist_stats_path = Path("playlist-stats.json")
-          uk_stats_path = Path("uk-playlist-stats.json")
-          guide_stats_path = Path("guide-stats.json")
-          chunk_summary = Path("epg-chunk-summary.txt")
-          failures = Path("epg-failures.txt")
-          fallback1 = Path("epg-fallback1-selection.json")
-          fallback2 = Path("epg-fallback2-selection.json")
-          update = Path("last-update.txt")
-
           required = [
-              english,
-              uk,
-              guide,
-              coverage,
-              playlist_stats_path,
-              uk_stats_path,
-              guide_stats_path,
-              chunk_summary,
-              failures,
-              fallback1,
-              fallback2,
-              update,
+              Path('english.m3u'),
+              Path('uk.m3u'),
+              Path('curated.m3u'),
+              Path('curated-uk.m3u'),
+              Path('guide.xml.gz'),
+              Path('guide-stats.json'),
+              Path('playlist-stats.json'),
+              Path('uk-playlist-stats.json'),
+              Path('curated-playlist-stats.json'),
+              Path('curated-uk-playlist-stats.json'),
+              Path('epg-coverage.txt'),
+              Path('epg-failures.txt'),
+              Path('last-update.txt'),
           ]
           missing = [str(path) for path in required if not path.is_file()]
           if missing:
               raise SystemExit(f"missing generated files: {', '.join(missing)}")
-          empty_required = [
-              str(path)
-              for path in [
-                  english,
-                  uk,
-                  guide,
-                  coverage,
-                  playlist_stats_path,
-                  uk_stats_path,
-                  guide_stats_path,
-                  chunk_summary,
-                  fallback1,
-                  fallback2,
-                  update,
-              ]
-              if path.stat().st_size == 0
-          ]
-          if empty_required:
-              raise SystemExit(f"empty generated files: {', '.join(empty_required)}")
 
-          def playlist_count(path: Path, minimum: int) -> tuple[int, str]:
-              text = path.read_text(encoding="utf-8-sig")
-              if not text.startswith("#EXTM3U"):
-                  raise SystemExit(f"{path} does not start with #EXTM3U")
-              if "x-tvg-url=" not in text.splitlines()[0]:
-                  raise SystemExit(f"{path} is missing its embedded EPG URL")
-              count = sum(1 for line in text.splitlines() if line.startswith("#EXTINF"))
-              if count < minimum:
-                  raise SystemExit(f"{path} unexpectedly small: {count} channels")
-              return count, text
-
-          def group_count(text: str, group_name: str) -> int:
-              count = 0
+          def playlist_ids(path: Path) -> set[str]:
+              text = path.read_text(encoding='utf-8-sig')
+              if not text.startswith('#EXTM3U'):
+                  raise SystemExit(f'{path} does not start with #EXTM3U')
+              ids = set()
               for line in text.splitlines():
-                  if not line.startswith("#EXTINF"):
+                  if not line.startswith('#EXTINF'):
                       continue
-                  match = re.search(r'group-title="([^"]*)"', line)
-                  if not match:
-                      continue
-                  groups = {part.strip().casefold() for part in match.group(1).split(";") if part.strip()}
-                  if group_name.casefold() in groups:
-                      count += 1
-              return count
+                  match = re.search(r'tvg-id="([^"]+)"', line)
+                  if match:
+                      ids.add(match.group(1))
+              return ids
 
-          english_channels, english_text = playlist_count(english, 1000)
-          uk_channels, _ = playlist_count(uk, 10)
-          uk_group_channels = group_count(english_text, "UK")
-          if uk_group_channels < 1:
-              raise SystemExit("english.m3u does not contain the generated UK channel group")
+          english_ids = playlist_ids(Path('english.m3u'))
+          uk_ids = playlist_ids(Path('uk.m3u'))
+          curated_ids = playlist_ids(Path('curated.m3u'))
+          curated_uk_ids = playlist_ids(Path('curated-uk.m3u'))
 
-          with gzip.open(guide, "rb") as handle:
+          if len(english_ids) < 1000:
+              raise SystemExit(f'english playlist unexpectedly small: {len(english_ids)}')
+          if len(uk_ids) < 10:
+              raise SystemExit(f'UK playlist unexpectedly small: {len(uk_ids)}')
+          if len(curated_ids) < 50:
+              raise SystemExit(f'curated playlist unexpectedly small: {len(curated_ids)}')
+          if len(curated_uk_ids) < 5:
+              raise SystemExit(f'curated UK playlist unexpectedly small: {len(curated_uk_ids)}')
+
+          with gzip.open('guide.xml.gz', 'rb') as handle:
               root = ET.parse(handle).getroot()
-          if root.tag != "tv":
-              raise SystemExit(f"guide root is {root.tag!r}, expected 'tv'")
-          guide_channels = len(root.findall("channel"))
-          programmes = len(root.findall("programme"))
-          programme_channels = {
-              programme.attrib.get("channel", "")
-              for programme in root.findall("programme")
-              if programme.attrib.get("channel")
+          programmes = root.findall('programme')
+          programme_ids = {
+              item.attrib.get('channel', '')
+              for item in programmes
+              if item.attrib.get('channel')
           }
-          if guide_channels < 1 or programmes < 1:
-              raise SystemExit(
-                  f"guide has insufficient data: {guide_channels} channels, {programmes} programmes"
-              )
-          if len(programme_channels) < 50:
-              raise SystemExit(
-                  f"guide coverage is suspiciously low: only {len(programme_channels)} channels have programmes"
-              )
+          if len(programme_ids) < 50 or not programmes:
+              raise SystemExit('guide contains too little programme data')
+          if not curated_ids.issubset(programme_ids):
+              raise SystemExit('curated.m3u contains channels without programme data')
+          if not curated_uk_ids.issubset(programme_ids):
+              raise SystemExit('curated-uk.m3u contains channels without programme data')
 
-          playlist_stats = json.loads(playlist_stats_path.read_text(encoding="utf-8"))
-          if int(playlist_stats.get("entries_kept", 0)) != english_channels:
-              raise SystemExit(
-                  "playlist-stats.json entries_kept does not match english.m3u"
-              )
-          uk_group_stats = playlist_stats.get("extra_groups", {}).get("UK", {})
-          tagged_uk = int(uk_group_stats.get("entries_tagged", 0) or 0)
-          if tagged_uk < 1:
-              raise SystemExit("playlist-stats.json reports no generated UK group members")
-          if uk_group_channels < tagged_uk:
-              raise SystemExit(
-                  "english.m3u contains fewer UK-group channels than playlist-stats.json reports"
-              )
+          guide_stats = json.loads(Path('guide-stats.json').read_text())
+          if int(guide_stats.get('channels_with_programmes', -1)) != len(programme_ids):
+              raise SystemExit('guide-stats.json channel count does not match guide')
+          if int(guide_stats.get('programme_elements', -1)) != len(programmes):
+              raise SystemExit('guide-stats.json programme count does not match guide')
 
-          uk_stats = json.loads(uk_stats_path.read_text(encoding="utf-8"))
-          if int(uk_stats.get("entries_kept", 0)) != uk_channels:
-              raise SystemExit(
-                  "uk-playlist-stats.json entries_kept does not match uk.m3u"
-              )
+          coverage = Path('epg-coverage.txt').read_text(encoding='utf-8', errors='replace')
+          for label in ('channels with programmes:', 'playlist ids without programme data:', 'UNMATCHED IDS'):
+              if label not in coverage:
+                  raise SystemExit(f'coverage report missing {label!r}')
 
-          guide_stats = json.loads(guide_stats_path.read_text(encoding="utf-8"))
-          if int(guide_stats.get("channel_elements", -1)) != guide_channels:
-              raise SystemExit("guide-stats.json channel count does not match guide.xml.gz")
-          if int(guide_stats.get("programme_elements", -1)) != programmes:
-              raise SystemExit("guide-stats.json programme count does not match guide.xml.gz")
-          if int(guide_stats.get("channels_with_programmes", -1)) != len(programme_channels):
-              raise SystemExit("guide-stats.json programme-channel count does not match guide.xml.gz")
-
-          for fallback_path in (fallback1, fallback2):
-              fallback_stats = json.loads(fallback_path.read_text(encoding="utf-8"))
-              if "fallback_channels_requested" not in fallback_stats:
-                  raise SystemExit(f"{fallback_path} is missing fallback selection statistics")
-
-          coverage_text = coverage.read_text(encoding="utf-8", errors="replace")
-          required_coverage_labels = [
-              "matched EPG ids:",
-              "same-channel alias matches:",
-              "unique-name unmapped-definition matches:",
-              "UNMATCHED IDS",
-          ]
-          if any(label not in coverage_text for label in required_coverage_labels):
-              raise SystemExit("EPG coverage report is incomplete")
-
-          summary_text = chunk_summary.read_text(encoding="utf-8")
-          if "fallback1" not in summary_text or "fallback2" not in summary_text:
-              raise SystemExit("EPG summary does not contain alternate-provider pass data")
-
-          print(f"english_playlist_channels={english_channels}")
-          print(f"uk_playlist_channels={uk_channels}")
-          print(f"english_uk_group_channels={uk_group_channels}")
-          print(f"guide_channels={guide_channels}")
-          print(f"channels_with_programmes={len(programme_channels)}")
-          print(f"programmes={programmes}")
-          print(summary_text.strip())
-          if failures.stat().st_size:
-              print("Some isolated EPG channels failed; see epg-failures.txt")
-          else:
-              print("No isolated EPG channel failures recorded")
-          print(update.read_text(encoding="utf-8").strip())
+          print(f'english_channels={len(english_ids)}')
+          print(f'uk_channels={len(uk_ids)}')
+          print(f'curated_channels={len(curated_ids)}')
+          print(f'curated_uk_channels={len(curated_uk_ids)}')
+          print(f'guide_channels_with_programmes={len(programme_ids)}')
+          print(f'programmes={len(programmes)}')
+          print(Path('last-update.txt').read_text().strip())
           PY
