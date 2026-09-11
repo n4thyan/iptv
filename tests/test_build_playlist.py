@@ -54,6 +54,69 @@ class PlaylistBuilderTests(unittest.TestCase):
         attrs = {"group-title": "XXX"}
         self.assertTrue(mod.adult_by_fallback(attrs, "Example TV"))
 
+    def test_extract_tvg_ids_ignores_non_channel_lines(self):
+        text = """#EXTM3U
+#EXTINF:-1 tvg-id="BBCOne.uk@London" group-title="General",BBC One
+https://example.com/bbc.m3u8
+#EXTVLCOPT:http-user-agent=Kodi
+#EXTINF:-1 tvg-id="ITV1.uk@London",ITV1
+https://example.com/itv.m3u8
+"""
+        self.assertEqual(
+            mod.extract_tvg_ids(text),
+            {"BBCOne.uk@London", "ITV1.uk@London"},
+        )
+
+    def test_extra_group_spec_requires_name_and_source(self):
+        self.assertEqual(
+            mod.parse_extra_group_spec("UK=https://example.com/uk.m3u"),
+            ("UK", "https://example.com/uk.m3u"),
+        )
+        with self.assertRaises(Exception):
+            mod.parse_extra_group_spec("UK")
+        with self.assertRaises(Exception):
+            mod.parse_extra_group_spec("=https://example.com/uk.m3u")
+
+    def test_add_group_appends_without_rebuilding_extinf(self):
+        line = (
+            '#EXTINF:-1 tvg-id="BBCOne.uk@London" tvg-logo="https://example/logo.png" '
+            'group-title="General;Entertainment",BBC One London'
+        )
+        self.assertEqual(
+            mod.add_group_to_extinf(line, "UK"),
+            (
+                '#EXTINF:-1 tvg-id="BBCOne.uk@London" tvg-logo="https://example/logo.png" '
+                'group-title="General;Entertainment;UK",BBC One London'
+            ),
+        )
+
+    def test_add_group_is_idempotent_case_insensitively(self):
+        line = '#EXTINF:-1 tvg-id="BBCOne.uk" group-title="General;UK",BBC One'
+        self.assertEqual(mod.add_group_to_extinf(line, "uk"), line)
+
+    def test_add_group_inserts_group_title_when_missing(self):
+        line = '#EXTINF:-1 tvg-id="BBCOne.uk" tvg-logo="https://example/logo.png",BBC One'
+        self.assertEqual(
+            mod.add_group_to_extinf(line, "UK"),
+            (
+                '#EXTINF:-1 tvg-id="BBCOne.uk" tvg-logo="https://example/logo.png" '
+                'group-title="UK",BBC One'
+            ),
+        )
+
+    def test_add_group_handles_commas_inside_quoted_metadata(self):
+        line = (
+            '#EXTINF:-1 tvg-id="BBCOne.uk" tvg-logo="https://example/logo,small.png",'
+            'BBC One'
+        )
+        self.assertEqual(
+            mod.add_group_to_extinf(line, "UK"),
+            (
+                '#EXTINF:-1 tvg-id="BBCOne.uk" tvg-logo="https://example/logo,small.png" '
+                'group-title="UK",BBC One'
+            ),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
