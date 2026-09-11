@@ -110,7 +110,7 @@ $downloads = [ordered]@{
     "last-update.txt" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/last-update.txt"
     "guide-stats.json" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/guide-stats.json"
     "epg-coverage.txt" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-coverage.txt"
-    "epg-pass-summary.json" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-pass-summary.json"
+    "epg-chunk-summary.txt" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-chunk-summary.txt"
 }
 
 foreach ($item in $downloads.GetEnumerator()) {
