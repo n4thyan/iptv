@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Build a fast, exact-ID XMLTV guide from prebuilt XMLTV feeds.
+"""Build a fast Kodi XMLTV guide from prebuilt feeds.
 
-This is the default production path for the Kodi project.  It deliberately avoids
-scraping thousands of channels provider-by-provider.  Instead it downloads a
-small curated set of already-generated XMLTV feeds, keeps only programme data
-whose channel IDs exactly match tvg-id values in our playlist, de-duplicates
-programme rows and writes a compact guide suitable for Kodi.
+EPG providers and IPTV-org often describe the same channel with different ID
+punctuation (for example ``Channel.4.HD.uk`` vs ``Channel4.uk@UKHD``).  This
+builder first honours exact IDs, then uses a deliberately conservative,
+country-aware compatibility key.  Compatible source rows are rewritten to the
+*exact* IPTV-org tvg-id values used by the playlist so Kodi can join the guide
+without manual channel mapping.
 """
 
 from __future__ import annotations
@@ -13,15 +14,19 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import re
 import shutil
 import tempfile
 import urllib.request
 import xml.etree.ElementTree as ET
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
 
-USER_AGENT = "Kodi-IPTV-EPG-Builder/2.0"
+USER_AGENT = "Kodi-IPTV-EPG-Builder/2.1"
+QUALITY_SUFFIXES = ("uhd", "fhd", "hd", "sd")
+NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
 
 
 def local_name(tag: str) -> str:
@@ -76,9 +81,94 @@ def child_text(element: ET.Element, wanted: str) -> str:
     return ""
 
 
+def playlist_base_id(identifier: str) -> str:
+    return identifier.split("@", 1)[0].strip()
+
+
+def split_country_id(identifier: str) -> tuple[str, str] | None:
+    """Return (stem, country) for Channel.Name.uk-style IDs."""
+    base = playlist_base_id(identifier)
+    if "." not in base:
+        return None
+    stem, country = base.rsplit(".", 1)
+    country = NON_ALNUM_RE.sub("", country.casefold())
+    if not stem or not country:
+        return None
+    return stem, country
+
+
+def normalized_stems(stem: str) -> list[str]:
+    """Create conservative punctuation/quality variants for an ID stem."""
+    normalized = NON_ALNUM_RE.sub("", stem.casefold())
+    if not normalized:
+        return []
+    values = [normalized]
+    for suffix in QUALITY_SUFFIXES:
+        if normalized.endswith(suffix) and len(normalized) > len(suffix) + 2:
+            stripped = normalized[: -len(suffix)]
+            if stripped and stripped not in values:
+                values.append(stripped)
+            break
+    return values
+
+
+def compatibility_keys(identifier: str) -> list[tuple[str, str]]:
+    parts = split_country_id(identifier)
+    if parts is None:
+        return []
+    stem, country = parts
+    return [(country, value) for value in normalized_stems(stem)]
+
+
+def build_target_index(
+    requested_ids: set[str],
+) -> dict[tuple[str, str], dict[str, set[str]]]:
+    """Index compatibility keys while retaining base-ID collision information."""
+    index: dict[tuple[str, str], dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for target_id in requested_ids:
+        base_id = playlist_base_id(target_id)
+        for key in compatibility_keys(target_id):
+            index[key][base_id].add(target_id)
+    return index
+
+
+def targets_for_source_id(
+    source_id: str,
+    requested_ids: set[str],
+    target_index: dict[tuple[str, str], dict[str, set[str]]],
+) -> tuple[list[str], str]:
+    """Resolve an XMLTV ID to exact playlist IDs without ambiguous fuzzy guessing."""
+    if source_id in requested_ids:
+        return [source_id], "exact"
+
+    for key in compatibility_keys(source_id):
+        base_groups = target_index.get(key, {})
+        # Multiple different IPTV-org base channels collapsing to one key is
+        # ambiguous.  Feed variants of the same base channel are safe to clone.
+        if len(base_groups) != 1:
+            continue
+        targets = next(iter(base_groups.values()))
+        if targets:
+            return sorted(targets), "compatible"
+    return [], "unmatched"
+
+
+def clone_channel_for_target(element: ET.Element, target_id: str) -> ET.Element:
+    clone = clone_element(element)
+    clone.set("id", target_id)
+    return clone
+
+
+def clone_programme_for_target(element: ET.Element, target_id: str) -> ET.Element:
+    clone = clone_element(element)
+    clone.set("channel", target_id)
+    return clone
+
+
 def parse_source(
     path: Path,
     requested_ids: set[str],
+    target_index: dict[tuple[str, str], dict[str, set[str]]],
     channel_elements: dict[str, ET.Element],
     programmes: list[ET.Element],
     seen_programmes: set[tuple[str, str, str, str]],
@@ -86,34 +176,71 @@ def parse_source(
 ) -> dict[str, int]:
     kept_channels = 0
     kept_programmes = 0
+    exact_source_channels: set[str] = set()
+    compatible_source_channels: set[str] = set()
+    unmatched_source_channels: set[str] = set()
     opener = gzip.open if path.suffix.casefold() == ".gz" else open
+
+    # Cache source-ID resolution because every programme row repeats the same ID.
+    resolved: dict[str, tuple[list[str], str]] = {}
+
+    def resolve(source_id: str) -> tuple[list[str], str]:
+        if source_id not in resolved:
+            resolved[source_id] = targets_for_source_id(source_id, requested_ids, target_index)
+        return resolved[source_id]
 
     with opener(path, "rb") as handle:
         for _event, element in ET.iterparse(handle, events=("end",)):
             tag = local_name(element.tag)
             if tag == "channel":
-                channel_id = element.attrib.get("id", "").strip()
-                if channel_id in requested_ids and channel_id not in channel_elements:
-                    channel_elements[channel_id] = clone_element(element)
-                    kept_channels += 1
-                element.clear()
-            elif tag == "programme":
-                channel_id = element.attrib.get("channel", "").strip()
-                if channel_id in requested_ids:
-                    signature = (
-                        channel_id,
-                        element.attrib.get("start", ""),
-                        element.attrib.get("stop", ""),
-                        child_text(element, "title"),
-                    )
-                    if signature not in seen_programmes:
-                        seen_programmes.add(signature)
-                        programmes.append(clone_element(element))
-                        programmed_ids.add(channel_id)
-                        kept_programmes += 1
+                source_id = element.attrib.get("id", "").strip()
+                targets, mode = resolve(source_id)
+                if mode == "exact":
+                    exact_source_channels.add(source_id)
+                elif mode == "compatible":
+                    compatible_source_channels.add(source_id)
+                elif source_id:
+                    unmatched_source_channels.add(source_id)
+
+                for target_id in targets:
+                    if target_id not in channel_elements:
+                        channel_elements[target_id] = clone_channel_for_target(element, target_id)
+                        kept_channels += 1
                 element.clear()
 
-    return {"channels": kept_channels, "programmes": kept_programmes}
+            elif tag == "programme":
+                source_id = element.attrib.get("channel", "").strip()
+                targets, mode = resolve(source_id)
+                if mode == "exact":
+                    exact_source_channels.add(source_id)
+                elif mode == "compatible":
+                    compatible_source_channels.add(source_id)
+                elif source_id:
+                    unmatched_source_channels.add(source_id)
+
+                title = child_text(element, "title")
+                for target_id in targets:
+                    signature = (
+                        target_id,
+                        element.attrib.get("start", ""),
+                        element.attrib.get("stop", ""),
+                        title,
+                    )
+                    if signature in seen_programmes:
+                        continue
+                    seen_programmes.add(signature)
+                    programmes.append(clone_programme_for_target(element, target_id))
+                    programmed_ids.add(target_id)
+                    kept_programmes += 1
+                element.clear()
+
+    return {
+        "channels": kept_channels,
+        "programmes": kept_programmes,
+        "exact_source_ids": len(exact_source_channels),
+        "compatible_source_ids": len(compatible_source_channels),
+        "unmatched_source_ids": len(unmatched_source_channels),
+    }
 
 
 def write_guide(
@@ -179,6 +306,7 @@ def main() -> int:
     if not sources:
         raise SystemExit("EPG source list is empty")
 
+    target_index = build_target_index(requested_ids)
     channel_elements: dict[str, ET.Element] = {}
     programmes: list[ET.Element] = []
     seen_programmes: set[tuple[str, str, str, str]] = set()
@@ -195,12 +323,7 @@ def main() -> int:
             future_map = {}
             for index, source in enumerate(sources, start=1):
                 destination = temp_dir / f"source-{index:03d}{source_suffix(source)}"
-                future = executor.submit(
-                    download_source,
-                    source,
-                    destination,
-                    args.download_timeout,
-                )
+                future = executor.submit(download_source, source, destination, args.download_timeout)
                 future_map[future] = (index, source)
 
             for future in as_completed(future_map):
@@ -209,20 +332,12 @@ def main() -> int:
                     path = future.result()
                     downloads[index] = path
                     source_stats.append(
-                        {
-                            "source": source,
-                            "downloaded": True,
-                            "bytes": path.stat().st_size,
-                        }
+                        {"source": source, "downloaded": True, "bytes": path.stat().st_size}
                     )
                 except Exception as exc:
                     failures.append(f"download\t{source}\t{exc}")
                     source_stats.append(
-                        {
-                            "source": source,
-                            "downloaded": False,
-                            "error": str(exc),
-                        }
+                        {"source": source, "downloaded": False, "error": str(exc)}
                     )
 
         for index, source in enumerate(sources, start=1):
@@ -233,6 +348,7 @@ def main() -> int:
                 parsed = parse_source(
                     path,
                     requested_ids,
+                    target_index,
                     channel_elements,
                     programmes,
                     seen_programmes,
@@ -248,13 +364,20 @@ def main() -> int:
 
             for item in source_stats:
                 if item.get("source") == source:
-                    item["matched_channel_elements"] = parsed["channels"]
-                    item["matched_programmes"] = parsed["programmes"]
+                    item.update(
+                        {
+                            "matched_channel_elements": parsed["channels"],
+                            "matched_programmes": parsed["programmes"],
+                            "exact_source_ids": parsed["exact_source_ids"],
+                            "compatible_source_ids": parsed["compatible_source_ids"],
+                            "unmatched_source_ids": parsed["unmatched_source_ids"],
+                        }
+                    )
                     break
 
     if not programmes:
         failures_path.parent.mkdir(parents=True, exist_ok=True)
-        failures_path.write_text("\n".join(failures) + "\n", encoding="utf-8")
+        failures_path.write_text(("\n".join(failures) + "\n") if failures else "", encoding="utf-8")
         raise SystemExit("no programme data matched the playlist IDs")
 
     write_guide(output_path, channel_elements, programmes, programmed_ids)
