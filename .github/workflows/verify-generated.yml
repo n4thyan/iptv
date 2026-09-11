@@ -32,6 +32,7 @@ jobs:
           python - <<'PY'
           import gzip
           import json
+          import re
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
@@ -79,7 +80,7 @@ jobs:
           if empty_required:
               raise SystemExit(f"empty generated files: {', '.join(empty_required)}")
 
-          def playlist_count(path: Path, minimum: int) -> int:
+          def playlist_count(path: Path, minimum: int) -> tuple[int, str]:
               text = path.read_text(encoding="utf-8-sig")
               if not text.startswith("#EXTM3U"):
                   raise SystemExit(f"{path} does not start with #EXTM3U")
@@ -88,10 +89,26 @@ jobs:
               count = sum(1 for line in text.splitlines() if line.startswith("#EXTINF"))
               if count < minimum:
                   raise SystemExit(f"{path} unexpectedly small: {count} channels")
+              return count, text
+
+          def group_count(text: str, group_name: str) -> int:
+              count = 0
+              for line in text.splitlines():
+                  if not line.startswith("#EXTINF"):
+                      continue
+                  match = re.search(r'group-title="([^"]*)"', line)
+                  if not match:
+                      continue
+                  groups = {part.strip().casefold() for part in match.group(1).split(";") if part.strip()}
+                  if group_name.casefold() in groups:
+                      count += 1
               return count
 
-          english_channels = playlist_count(english, 1000)
-          uk_channels = playlist_count(uk, 10)
+          english_channels, english_text = playlist_count(english, 1000)
+          uk_channels, _ = playlist_count(uk, 10)
+          uk_group_channels = group_count(english_text, "UK")
+          if uk_group_channels < 1:
+              raise SystemExit("english.m3u does not contain the generated UK channel group")
 
           with gzip.open(guide, "rb") as handle:
               root = ET.parse(handle).getroot()
@@ -114,6 +131,15 @@ jobs:
               raise SystemExit(
                   "playlist-stats.json entries_kept does not match english.m3u"
               )
+          uk_group_stats = playlist_stats.get("extra_groups", {}).get("UK", {})
+          tagged_uk = int(uk_group_stats.get("entries_tagged", 0) or 0)
+          if tagged_uk < 1:
+              raise SystemExit("playlist-stats.json reports no generated UK group members")
+          if uk_group_channels < tagged_uk:
+              raise SystemExit(
+                  "english.m3u contains fewer UK-group channels than playlist-stats.json reports"
+              )
+
           uk_stats = json.loads(uk_stats_path.read_text(encoding="utf-8"))
           if int(uk_stats.get("entries_kept", 0)) != uk_channels:
               raise SystemExit(
@@ -134,6 +160,7 @@ jobs:
 
           print(f"english_playlist_channels={english_channels}")
           print(f"uk_playlist_channels={uk_channels}")
+          print(f"english_uk_group_channels={uk_group_channels}")
           print(f"guide_channels={guide_channels}")
           print(f"channels_with_programmes={len(programme_channels)}")
           print(f"programmes={programmes}")
