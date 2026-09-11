@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 import unittest
 from pathlib import Path
 import xml.etree.ElementTree as ET
@@ -8,6 +9,7 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "build_epg_chann
 spec = importlib.util.spec_from_file_location("build_epg_channels", MODULE_PATH)
 mod = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
+sys.modules[spec.name] = mod
 spec.loader.exec_module(mod)
 
 
