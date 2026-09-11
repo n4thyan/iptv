@@ -30,6 +30,20 @@ class FastEpgBuilderTests(unittest.TestCase):
         self.assertEqual(mode, "unmatched")
         self.assertEqual(targets, [])
 
+    def test_us2_dataset_suffix_maps_to_us_playlist_namespace(self):
+        requested = {"BBCNews.us", "CNBC.us"}
+        index = mod.build_target_index(requested)
+        targets, mode = mod.targets_for_source_id("CNBC.HD.us2", requested, index)
+        self.assertEqual(mode, "compatible")
+        self.assertEqual(targets, ["CNBC.us"])
+
+    def test_us_special_dataset_suffixes_map_to_us_country_only(self):
+        requested = {"KABCDT1.us", "ESPN.us"}
+        index = mod.build_target_index(requested)
+        self.assertEqual(mod.split_country_id("KABCDT1.us_locals1")[1], "us")
+        self.assertEqual(mod.split_country_id("ESPN.HD.us_sports1")[1], "us")
+        self.assertEqual(mod.split_country_id("ESPN.HD.uk")[1], "uk")
+
     def test_regional_bbc_one_london_maps_to_london_playlist_variants(self):
         requested = {
             "BBCOne.uk@London",
