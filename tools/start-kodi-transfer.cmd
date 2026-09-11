@@ -1,10 +1,18 @@
 @echo off
 setlocal
-set "SCRIPT=%~dp0prepare-kodi-transfer.ps1"
-echo Starting the temporary Kodi transfer share with Administrator rights...
-powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath 'powershell.exe' -Verb RunAs -ArgumentList '-NoProfile -ExecutionPolicy Bypass -File \"\"%SCRIPT%\"\" -CreateShare'"
-if errorlevel 1 (
-  echo Failed to request Administrator access.
-  pause
+
+net session >nul 2>&1
+if not "%errorlevel%"=="0" (
+  echo Requesting Administrator access...
+  powershell.exe -NoProfile -Command "Start-Process -FilePath '%~f0' -Verb RunAs"
+  exit /b
 )
+
+echo Preparing the temporary Kodi SMB transfer share...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0prepare-kodi-transfer.ps1" -CreateShare
+
+echo.
+echo Leave this window open while copying files between the PC and Kodi.
+echo You can close it after the transfer; the share itself can be removed with stop-kodi-transfer.cmd.
+pause
 endlocal
