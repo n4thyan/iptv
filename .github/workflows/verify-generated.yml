@@ -45,6 +45,8 @@ jobs:
           guide_stats_path = Path("guide-stats.json")
           chunk_summary = Path("epg-chunk-summary.txt")
           failures = Path("epg-failures.txt")
+          fallback1 = Path("epg-fallback1-selection.json")
+          fallback2 = Path("epg-fallback2-selection.json")
           update = Path("last-update.txt")
 
           required = [
@@ -57,6 +59,8 @@ jobs:
               guide_stats_path,
               chunk_summary,
               failures,
+              fallback1,
+              fallback2,
               update,
           ]
           missing = [str(path) for path in required if not path.is_file()]
@@ -73,6 +77,8 @@ jobs:
                   uk_stats_path,
                   guide_stats_path,
                   chunk_summary,
+                  fallback1,
+                  fallback2,
                   update,
               ]
               if path.stat().st_size == 0
@@ -125,6 +131,10 @@ jobs:
               raise SystemExit(
                   f"guide has insufficient data: {guide_channels} channels, {programmes} programmes"
               )
+          if len(programme_channels) < 50:
+              raise SystemExit(
+                  f"guide coverage is suspiciously low: only {len(programme_channels)} channels have programmes"
+              )
 
           playlist_stats = json.loads(playlist_stats_path.read_text(encoding="utf-8"))
           if int(playlist_stats.get("entries_kept", 0)) != english_channels:
@@ -154,9 +164,24 @@ jobs:
           if int(guide_stats.get("channels_with_programmes", -1)) != len(programme_channels):
               raise SystemExit("guide-stats.json programme-channel count does not match guide.xml.gz")
 
+          for fallback_path in (fallback1, fallback2):
+              fallback_stats = json.loads(fallback_path.read_text(encoding="utf-8"))
+              if "fallback_channels_requested" not in fallback_stats:
+                  raise SystemExit(f"{fallback_path} is missing fallback selection statistics")
+
           coverage_text = coverage.read_text(encoding="utf-8", errors="replace")
-          if "matched EPG ids:" not in coverage_text or "UNMATCHED IDS" not in coverage_text:
+          required_coverage_labels = [
+              "matched EPG ids:",
+              "same-channel alias matches:",
+              "unique-name unmapped-definition matches:",
+              "UNMATCHED IDS",
+          ]
+          if any(label not in coverage_text for label in required_coverage_labels):
               raise SystemExit("EPG coverage report is incomplete")
+
+          summary_text = chunk_summary.read_text(encoding="utf-8")
+          if "fallback1" not in summary_text or "fallback2" not in summary_text:
+              raise SystemExit("EPG summary does not contain alternate-provider pass data")
 
           print(f"english_playlist_channels={english_channels}")
           print(f"uk_playlist_channels={uk_channels}")
@@ -164,7 +189,7 @@ jobs:
           print(f"guide_channels={guide_channels}")
           print(f"channels_with_programmes={len(programme_channels)}")
           print(f"programmes={programmes}")
-          print(chunk_summary.read_text(encoding="utf-8").strip())
+          print(summary_text.strip())
           if failures.stat().st_size:
               print("Some isolated EPG channels failed; see epg-failures.txt")
           else:
