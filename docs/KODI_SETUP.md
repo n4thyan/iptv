@@ -1,130 +1,99 @@
-# Kodi on Xbox — final IPTV setup
+# Kodi on Xbox — current IPTV setup
 
-These steps are for the generated playlist/EPG, not the raw upstream URLs.
+These steps use the generated curated playlist/EPG, not raw upstream URLs.
 
-## Recommended setup method: type the URLs from the PC
+## 1. Recommended sources
 
-You do **not** need to type the long GitHub URLs with the Xbox controller.
+For normal use:
 
-Use [`PC_TO_KODI.md`](PC_TO_KODI.md). For initial IPTV setup the easiest/safest Windows flow is:
+- M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u`
+- XMLTV: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
 
-1. on Kodi enable **Settings → Services → Control → Allow remote control via HTTP**;
-2. open the M3U URL field so Kodi's on-screen keyboard is visible;
-3. on the PC double-click `tools\kodi-url-helper.cmd`, enter the Xbox IP and choose the English M3U;
-4. repeat with the EPG URL field and choose the XMLTV EPG;
-5. save the IPTV Simple configuration and fully restart Kodi.
+For a UK-only installation:
 
-The helper uses Kodi's supported JSON-RPC `Input.SendText` method. Nothing is hosted by the PC, so it can be switched off afterwards.
+- M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u`
+- XMLTV: keep the same guide URL
 
-For actual file transfers/backups later, the repo also includes `tools\start-kodi-transfer.cmd` / `tools\stop-kodi-transfer.cmd` for a temporary Windows SMB share. Direct editing of IPTV Simple's `instance-settings-*.xml` is retained only as an advanced fallback.
+The broader `english.m3u` and `uk.m3u` outputs still exist, but they intentionally contain many channels with no programme data. Use them only when browsing the full source list is more important than a clean guide.
 
-The manual settings below show exactly what Kodi should contain.
+## 2. Fastest Xbox entry method
 
-## 1. Open IPTV Simple Client
+You do not need to type long GitHub URLs with the Xbox controller.
 
-In Kodi:
+Enable:
+
+**Settings → Services → Control → Allow remote control via HTTP**
+
+Then, with the target text field open on Kodi, run `tools\kodi-url-helper.cmd` on the PC. Its first choice is the curated English playlist, followed by the shared EPG and curated UK playlist.
+
+This uses Kodi JSON-RPC only for text entry. The PC is not a permanent host and can be switched off afterwards.
+
+## 3. IPTV Simple Client
+
+Open:
 
 **Add-ons → My add-ons → PVR clients → IPTV Simple Client → Configure**
 
-Edit the main enabled configuration.
-
-## 2. Choose the playlist
-
-For the full English-language worldwide list, use:
-
-`https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u`
-
-For a much smaller UK-only list, use:
-
-`https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u`
-
-Under **General** set:
+Under **General**:
 
 - Location: **Remote path (Internet address)**
-- M3U playlist URL: one of the URLs above
+- M3U playlist URL: curated English or curated UK URL above
 
-Both generated playlists point at the same guide and preserve IPTV-org `tvg-id`, logo, group and stream-option metadata.
-
-### Recommended choice
-
-Use the full generated `english.m3u` unless you specifically want a UK-only installation.
-
-The full playlist automatically adds a **UK** PVR group to channels that also appear in IPTV-org's UK country feed while preserving the normal Movies, News, Entertainment, Kids and other source groups.
-
-Do **not** add a second IPTV Simple configuration solely for the UK playlist if you are already using `english.m3u`; that would duplicate UK channels in **All channels**. The generated UK group is designed to avoid that.
-
-## 3. EPG
-
-Under **EPG** set:
+Under **EPG**:
 
 - Location: **Remote path (Internet address)**
-- XMLTV URL:
-
-`https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
+- XMLTV URL: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
 
 Save the configuration.
 
-The EPG generator tries exact channel IDs first, then safe same-channel feed aliases, then conservative unique-name mappings for upstream EPG definitions that have no `xmltv_id`. If the first mapped provider returns no programmes, the build can try up to two alternate providers before leaving that channel blank.
-
 ## 4. Reload Kodi
 
-Fully quit Kodi from the Xbox dashboard, then reopen it. Allow PVR Manager time to import the playlist and EPG.
+Fully quit Kodi from the Xbox dashboard, then reopen it. Let PVR Manager finish importing before judging the guide.
 
 Open:
 
 **TV → Guide**
 
-The playlist and XMLTV guide use the same final channel IDs, so Kodi normally attaches schedule data by `tvg-id`.
+The generated guide rewrites programme/channel IDs to the exact playlist `tvg-id` values, so Kodi can attach listings without manual per-channel mapping.
 
-When using the full playlist, cycle the guide's channel group selector and you should see **UK** alongside the original IPTV categories. This group comes from the generated M3U and does not need to be populated manually in Kodi's Group Manager.
+## 5. What the EPG matcher actually does
 
-## 5. Favourites
+Production guide generation uses current prebuilt XMLTV feeds. It accepts exact IDs first, then only explicit conservative compatibility cases such as known punctuation/quality differences, known provider dataset suffixes and explicit regional aliases. Ambiguous matches are rejected.
 
-Keep favourites as a Kodi-side choice rather than baking them into the generated playlist. That way daily playlist refreshes cannot overwrite your personal selection.
+This is deliberately different from the retired slow provider-by-provider scraper. The current production build is designed to finish quickly and publish only real matched programme rows.
 
-Use Kodi's normal favourite/channel-group controls for the handful of channels you actually use most often.
+## 6. Diagnostics
 
-## 6. If the guide is empty or looks stale
-
-Before changing URLs, check the generated build status/files:
+If the guide is empty or stale, check:
 
 - `https://raw.githubusercontent.com/n4thyan/iptv/generated/last-update.txt`
 - `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide-stats.json`
-- `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-chunk-summary.txt`
-- `https://raw.githubusercontent.com/n4thyan/iptv/generated/playlist-stats.json`
+- `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-playlist-stats.json`
 - `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-coverage.txt`
+- `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-failures.txt`
 
-If those are current, fully restart Kodi. If necessary, clear PVR/EPG data from Kodi's PVR settings and let IPTV Simple import the playlist and guide again.
+If those look current and healthy, fully restart Kodi. Only then clear PVR/EPG data and let IPTV Simple import again if necessary.
 
-Some channels can still legitimately have no programme data because no reliable listings provider exists for them. The project records those in `epg-coverage.txt` rather than inventing schedules.
+## 7. Stream failures
 
-## 7. If a channel does not play
+A blank/failed stream is separate from EPG health. Public IPTV streams can be geo-restricted, temporarily unavailable or require request headers. Do not remove a stream because one probe fails.
 
-Do not assume the whole playlist is broken. Public IPTV streams can be temporarily unavailable, geo-restricted or require specific request headers. The generated playlist preserves IPTV-org's stream directives.
+Use the conservative local validator in `tools/validate_streams.py` when a proper cleanup pass is wanted.
 
-For a systematic cleanup from the same network as the Xbox, use the local validator documented in [`STREAM_VALIDATION.md`](STREAM_VALIDATION.md). It requires repeated failures before removing a stream.
+## 8. Kodi presentation / catch-up phase
 
-## 8. PC transfer/maintenance uses later
+The data layer is now separate from the UI layer. Current Kodi-side work is:
 
-The temporary SMB path can be used later for:
+1. tune the installed Sky/Sky-Q-style skin and guide layout;
+2. arrange channel numbering, groups and favourites;
+3. expose BBC iPlayer inside the main TV / Videos / Movies navigation using the skin's custom menu/widget features where practical;
+4. add other legitimate catch-up services only where they work reliably on Xbox Kodi;
+5. map controller/remote actions so normal viewing feels appliance-like.
 
-1. backing up IPTV Simple instance settings,
-2. copying controller/remote keymaps,
-3. moving custom logos or artwork,
-4. exporting Kodi config files for editing on the PC,
-5. restoring known-good files after testing.
+BBC iPlayer playback already works; the remaining job is integrating it into the main navigation rather than treating it as an isolated add-on.
 
-Start it with `tools\start-kodi-transfer.cmd` and remove it when finished with `tools\stop-kodi-transfer.cmd`.
+## 9. PC maintenance / backup
 
-## 9. What still belongs on the Kodi side
+For actual files such as skin config, keymaps, artwork or backups, use the temporary SMB helper documented in `PC_TO_KODI.md`.
 
-The data layer is separate from presentation. Once the generated playlist and guide are stable, Kodi-side work can be done without changing the generation pipeline:
-
-1. choose favourite channels,
-2. adjust channel ordering where useful,
-3. clean up any logos/artwork that look poor,
-4. map the Xbox controller/TV remote,
-5. install/tune a Sky+/Sky-Q-style skin or guide layout,
-6. add catch-up and radio integrations where they can be done cleanly.
-
-The PC is not required for ordinary viewing. It is only a convenient setup/maintenance workstation.
+The PC remains optional for setup and maintenance only. Normal live TV, EPG refreshes and iPlayer playback do not require it to remain online.

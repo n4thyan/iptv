@@ -10,7 +10,7 @@ Use the generated **curated** playlist for normal TV viewing:
 - Curated UK-only playlist: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u`
 - EPG: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
 
-The curated playlists contain only channels whose exact `tvg-id` has real programme rows in the generated XMLTV guide. This avoids filling Kodi's guide with thousands of blank rows.
+The curated playlists contain only channels whose final playlist `tvg-id` has real programme rows in the generated XMLTV guide. This avoids filling Kodi's guide with thousands of blank rows.
 
 The broader source playlists are still published when you want to browse everything:
 
@@ -23,9 +23,9 @@ All generated M3Us embed the same EPG URL in their `x-tvg-url` header.
 
 The first EPG implementation mapped the IPTV-org English playlist into `iptv-org/epg` and then scraped many guide providers channel-by-channel. It was accurate but far too slow for this project: a single primary pass could take well over an hour before fallback providers were attempted.
 
-The production pipeline now consumes a curated set of **prebuilt XMLTV feeds**, matches them to IPTV-org channels by exact ID, de-duplicates programme rows, and publishes only the matched data. The slow provider scraper scripts remain in the repository as research/enrichment tools, but they no longer block the daily Kodi build.
+The production pipeline now consumes a curated set of **prebuilt XMLTV feeds**, matches them to IPTV-org channels using exact IDs plus deliberately conservative known compatibility rules, de-duplicates programme rows, rewrites matched data to the playlist's exact `tvg-id` values, and publishes only channels with real programme data. The slow provider scraper scripts remain in the repository as research/enrichment tools, but they no longer block the daily Kodi build.
 
-`epg-feeds.txt` contains the maintained feed list. It prioritizes the UK and other English-speaking countries, plus the Western-European coverage useful for this setup and several FAST/streaming guide feeds.
+`epg-feeds.txt` contains the maintained feed list. It prioritizes the UK and other English-speaking countries, plus selected international coverage useful for this setup.
 
 ## Automatic build
 
@@ -36,8 +36,8 @@ The production pipeline now consumes a curated set of **prebuilt XMLTV feeds**, 
 3. preserves stream URLs, logos, IDs, channel groups and Kodi/VLC directives;
 4. appends a real `UK` group to matching entries in the full English list;
 5. downloads the prebuilt XMLTV feeds listed in `epg-feeds.txt` in parallel;
-6. keeps programme data only when the XMLTV channel ID exactly matches a playlist `tvg-id`;
-7. de-duplicates programme rows across overlapping feeds;
+6. keeps only programme data that can be mapped safely to current playlist `tvg-id` values;
+7. rewrites XMLTV IDs to those exact playlist IDs and de-duplicates programme rows;
 8. creates `curated.m3u` and `curated-uk.m3u` from channels that actually have programme data;
 9. validates the playlists and guide before publishing;
 10. force-refreshes the `generated` branch only after the build passes validation.
@@ -55,7 +55,7 @@ The `generated` branch also publishes:
 - `curated-playlist-stats.json` and `curated-uk-playlist-stats.json`;
 - `last-update.txt`.
 
-Coverage is intentionally exact-ID based. Wrong guide data is worse than a blank guide row, so the production build does not fuzzy-match vaguely similar channel names.
+Coverage is intentionally conservative. Wrong guide data is worse than a blank guide row, so ambiguous mappings are rejected instead of guessed.
 
 ## Main upstream playlist sources
 
@@ -78,7 +78,7 @@ If you only want UK channels, change the M3U URL to `curated-uk.m3u` and keep th
 
 The PC is only a setup/maintenance workstation. It is not required for normal playback or EPG updates.
 
-Useful helpers remain in `tools/` for sending long URLs to Kodi over JSON-RPC and for temporary SMB transfer/backup tasks.
+Useful helpers remain in `tools/` for sending long URLs to Kodi over JSON-RPC and for temporary SMB transfer/backup tasks. Those helpers now default to the curated playlist while retaining full-list options.
 
 ## Stream validation
 
@@ -88,4 +88,4 @@ Do not delete a stream because one HTTP probe fails. IPTV streams can be tempora
 
 ## Next project phase
 
-Once the generated curated playlist and guide are stable in Kodi, the next layer is presentation and service integration: a Sky/Sky-Q-style guide layout and navigation, followed by legal catch-up/service entry points such as BBC iPlayer and other broadcaster apps/services where Kodi/Xbox support permits it.
+The backend is stable enough to stop chasing marginal EPG coverage. The next layer is presentation and service integration: tune the installed Sky/Sky-Q-style guide/navigation, organise channel numbering/groups/favourites, and integrate working catch-up services such as BBC iPlayer into the main Kodi TV / Videos / Movies experience where the skin permits custom menu items and widgets.

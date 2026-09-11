@@ -3,7 +3,7 @@ param(
     [Parameter(Mandatory = $true, Position = 0)]
     [string]$Path,
 
-    [string]$PlaylistUrl = "https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u",
+    [string]$PlaylistUrl = "https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u",
     [string]$EpgUrl = "https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz",
     [switch]$NoBackup
 )
@@ -40,7 +40,7 @@ function Set-KodiSetting {
     $node.InnerText = $Value
 }
 
-# IPTV Simple uses 1 for REMOTE_PATH.  Keep both M3U and XMLTV on GitHub so the
+# IPTV Simple uses 1 for REMOTE_PATH. Keep both M3U and XMLTV on GitHub so the
 # Xbox does not depend on this PC after the one-time setup/transfer.
 Set-KodiSetting -Id "m3uPathType" -Value "1"
 Set-KodiSetting -Id "m3uUrl" -Value $PlaylistUrl
