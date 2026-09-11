@@ -65,51 +65,85 @@ jobs:
           python scripts/split_epg_channels.py
           --input output/epg.channels.xml
           --output-dir output/epg-chunks
-          --size 60
+          --size 20
           --manifest output/epg-chunks.json
 
       - name: Grab programme guide chunks
         working-directory: vendor/epg
         env:
-          NODE_OPTIONS: "--max-old-space-size=3072"
+          NODE_OPTIONS: "--max-old-space-size=4096"
         run: |
           set -u
           mkdir -p "$GITHUB_WORKSPACE/output/epg-fragments"
+          mkdir -p "$GITHUB_WORKSPACE/output/epg-retry"
           : > "$GITHUB_WORKSPACE/output/epg-failures.txt"
 
-          success=0
-          failed=0
+          primary_success=0
+          primary_failed=0
+          retry_success=0
+          retry_failed=0
 
           for channels in "$GITHUB_WORKSPACE"/output/epg-chunks/chunk-*.channels.xml; do
             chunk="$(basename "$channels" .channels.xml)"
             output="$GITHUB_WORKSPACE/output/epg-fragments/${chunk}.xml"
             echo "=== ${chunk} ==="
 
-            set +e
-            npm run grab -- \
+            if npm run grab -- \
               --channels="$channels" \
               --output="$output" \
               --days=2 \
-              --maxConnections=6 \
-              --timeout=20000
-            status=$?
-            set -e
-
-            if [ "$status" -eq 0 ] && [ -s "$output" ]; then
-              success=$((success + 1))
-            else
-              failed=$((failed + 1))
-              rm -f "$output"
-              printf '%s\texit=%s\n' "$chunk" "$status" >> "$GITHUB_WORKSPACE/output/epg-failures.txt"
+              --maxConnections=4 \
+              --timeout=20000 && [ -s "$output" ]; then
+              primary_success=$((primary_success + 1))
+              continue
             fi
+
+            primary_failed=$((primary_failed + 1))
+            rm -f "$output"
+            echo "${chunk} failed as a batch; retrying each channel separately"
+
+            retry_dir="$GITHUB_WORKSPACE/output/epg-retry/${chunk}"
+            python "$GITHUB_WORKSPACE/scripts/split_epg_channels.py" \
+              --input "$channels" \
+              --output-dir "$retry_dir" \
+              --size 1 \
+              --manifest "$retry_dir/manifest.json"
+
+            for retry_channels in "$retry_dir"/chunk-*.channels.xml; do
+              retry_name="$(basename "$retry_channels" .channels.xml)"
+              retry_output="$GITHUB_WORKSPACE/output/epg-fragments/${chunk}-${retry_name}.xml"
+              echo "--- ${chunk}/${retry_name} ---"
+
+              if npm run grab -- \
+                --channels="$retry_channels" \
+                --output="$retry_output" \
+                --days=2 \
+                --maxConnections=2 \
+                --timeout=20000 && [ -s "$retry_output" ]; then
+                retry_success=$((retry_success + 1))
+              else
+                status=$?
+                retry_failed=$((retry_failed + 1))
+                rm -f "$retry_output"
+                printf '%s/%s\texit=%s\n' "$chunk" "$retry_name" "$status" \
+                  >> "$GITHUB_WORKSPACE/output/epg-failures.txt"
+              fi
+            done
           done
 
-          printf 'successful_chunks=%s\nfailed_chunks=%s\n' "$success" "$failed" \
-            > "$GITHUB_WORKSPACE/output/epg-chunk-summary.txt"
+          cat > "$GITHUB_WORKSPACE/output/epg-chunk-summary.txt" <<EOF
+          primary_chunk_size=20
+          successful_primary_chunks=${primary_success}
+          failed_primary_chunks=${primary_failed}
+          successful_retry_channels=${retry_success}
+          failed_retry_channels=${retry_failed}
+          EOF
 
-          echo "EPG chunks: ${success} successful, ${failed} failed"
-          if [ "$success" -eq 0 ]; then
-            echo "No EPG chunks were generated successfully."
+          echo "Primary chunks: ${primary_success} successful, ${primary_failed} retried"
+          echo "Fallback channels: ${retry_success} successful, ${retry_failed} failed"
+
+          if ! compgen -G "$GITHUB_WORKSPACE/output/epg-fragments/*.xml" > /dev/null; then
+            echo "No EPG fragments were generated successfully."
             exit 1
           fi
 
@@ -119,6 +153,12 @@ jobs:
           "output/epg-fragments/chunk-*.xml"
           --output output/guide.xml
 
+      - name: Summarize programme guide
+        run: >-
+          python scripts/xmltv_stats.py
+          output/guide.xml
+          --output output/guide-stats.json
+
       - name: Compress guide
         run: gzip -9 -c output/guide.xml > output/guide.xml.gz
 
@@ -126,6 +166,7 @@ jobs:
         run: |
           test -s output/english.m3u
           test -s output/guide.xml.gz
+          test -s output/guide-stats.json
           grep -q '^#EXTM3U' output/english.m3u
           grep -q '<tv' output/guide.xml
           grep -q '<programme ' output/guide.xml
@@ -133,12 +174,14 @@ jobs:
           echo "guide_xml_bytes=$(wc -c < output/guide.xml)"
           echo "guide_gzip_bytes=$(wc -c < output/guide.xml.gz)"
           echo "programmes=$(grep -c '<programme ' output/guide.xml || true)"
+          cat output/guide-stats.json
 
       - name: Prepare generated branch
         run: |
           mkdir -p publish
           cp output/english.m3u publish/english.m3u
           cp output/guide.xml.gz publish/guide.xml.gz
+          cp output/guide-stats.json publish/guide-stats.json
           cp output/epg-coverage.txt publish/epg-coverage.txt
           cp output/playlist-stats.json publish/playlist-stats.json
           cp output/epg-chunk-summary.txt publish/epg-chunk-summary.txt
