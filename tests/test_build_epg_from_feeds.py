@@ -30,6 +30,40 @@ class FastEpgBuilderTests(unittest.TestCase):
         self.assertEqual(mode, "unmatched")
         self.assertEqual(targets, [])
 
+    def test_regional_bbc_one_london_maps_to_london_playlist_variants(self):
+        requested = {
+            "BBCOne.uk@London",
+            "BBCOne.uk@LondonHD",
+            "BBCOne.uk@East",
+            "BBCOne.uk@NorthernIreland",
+        }
+        index = mod.build_target_index(requested)
+        targets, mode = mod.targets_for_source_id("BBC.One.Lon.HD.uk", requested, index)
+        self.assertEqual(mode, "compatible")
+        self.assertEqual(targets, ["BBCOne.uk@London", "BBCOne.uk@LondonHD"])
+
+    def test_regional_bbc_one_ni_maps_without_cross_region_leakage(self):
+        requested = {
+            "BBCOne.uk@London",
+            "BBCOne.uk@NorthernIreland",
+            "BBCOne.uk@NorthernIrelandHD",
+            "BBCOne.uk@Scotland",
+        }
+        index = mod.build_target_index(requested)
+        targets, mode = mod.targets_for_source_id("BBC.One.NI.HD.uk", requested, index)
+        self.assertEqual(mode, "compatible")
+        self.assertEqual(
+            targets,
+            ["BBCOne.uk@NorthernIreland", "BBCOne.uk@NorthernIrelandHD"],
+        )
+
+    def test_regional_bbc_one_yorks_abbreviation_maps_to_yorkshire(self):
+        requested = {"BBCOne.uk@Yorkshire", "BBCOne.uk@YorkshireHD"}
+        index = mod.build_target_index(requested)
+        targets, mode = mod.targets_for_source_id("BBC.One.Yorks.HD.uk", requested, index)
+        self.assertEqual(mode, "compatible")
+        self.assertEqual(targets, ["BBCOne.uk@Yorkshire", "BBCOne.uk@YorkshireHD"])
+
     def test_parse_source_preserves_metadata_and_deduplicates_programmes(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "sample.xml.gz"
