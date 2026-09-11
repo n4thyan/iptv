@@ -310,8 +310,8 @@ def apply_history(
     if result.status == "working":
         result.consecutive_failures = 0
     elif result.status in {"access_restricted", "untested"}:
-        # These are not evidence of a dead stream.
-        result.consecutive_failures = old_failures
+        # A retained/non-dead result breaks the consecutive-failure streak.
+        result.consecutive_failures = 0
     else:
         result.consecutive_failures = old_failures + 1
 
@@ -415,7 +415,7 @@ def main() -> int:
         "drop_after_consecutive_failures": args.drop_after,
         "attempts_per_run": args.attempts,
         "timeout_seconds": args.timeout,
-        "note": "all removals require repeated failed validation runs; access_restricted and untested streams are retained",
+        "note": "all removals require repeated failed validation runs; working, access_restricted and untested results reset the failure streak",
     }
     Path(args.report).parent.mkdir(parents=True, exist_ok=True)
     Path(args.report).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
