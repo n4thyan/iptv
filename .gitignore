@@ -1,0 +1,11 @@
+# Generated locally
+output/
+vendor/
+__pycache__/
+*.pyc
+
+# Editor/OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
