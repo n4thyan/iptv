@@ -23,8 +23,8 @@ class FastEpgBuilderTests(unittest.TestCase):
 <tv>
   <channel id="BBCOne.uk"><display-name>BBC One</display-name></channel>
   <channel id="Other.us"><display-name>Other</display-name></channel>
-  <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="BBCOne.uk"><title>News</title></programme>
-  <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="BBCOne.uk"><title>News</title></programme>
+  <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="BBCOne.uk"><title>News</title><desc>Latest headlines.</desc></programme>
+  <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="BBCOne.uk"><title>News</title><desc>Latest headlines.</desc></programme>
   <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="Other.us"><title>Other</title></programme>
 </tv>'''
             with gzip.open(source, "wb") as handle:
@@ -48,6 +48,9 @@ class FastEpgBuilderTests(unittest.TestCase):
             self.assertEqual(programmed, {"BBCOne.uk"})
             self.assertEqual(len(programmes), 1)
             self.assertIn("BBCOne.uk", channels)
+            self.assertEqual(channels["BBCOne.uk"].findtext("display-name"), "BBC One")
+            self.assertEqual(programmes[0].findtext("title"), "News")
+            self.assertEqual(programmes[0].findtext("desc"), "Latest headlines.")
 
     def test_write_guide_only_outputs_programmed_channels(self):
         with tempfile.TemporaryDirectory() as tmp:
