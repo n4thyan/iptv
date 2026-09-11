@@ -2,32 +2,64 @@
 
 The PC is a **setup and maintenance tool**, not a server that must stay on.
 
-Normal Xbox playback should continue to use the generated GitHub endpoints:
+Normal Xbox playback uses the generated GitHub endpoints:
 
 - M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u`
 - EPG: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
 
-That means the PC can be switched off after setup.
+The PC can therefore be switched off after setup.
 
-## Why use the PC at all?
+## Fastest method: type into Kodi from the PC
 
-Typing long URLs with an Xbox controller is slow. Kodi's File Manager can copy files between the Xbox Kodi profile and an SMB/Windows share, so we can export the existing IPTV Simple instance settings, patch them on the PC, and copy them back.
+For the M3U and EPG URLs, the safest/easiest route is Kodi's supported JSON-RPC remote-input API. This avoids typing the long URLs with the Xbox controller **and** avoids editing Kodi's internal settings XML.
 
-This is also useful later for keymaps, skin configuration backups, custom logos, and other small Kodi files.
+### One-time Kodi setting
 
-## 1. Prepare a temporary Windows share
+On Xbox Kodi enable:
 
-### Easiest method
+**Settings → Services → Control → Allow remote control via HTTP**
+
+Note the port (normally `8080`) and any username/password you configure. The Xbox and PC must be on the same home LAN.
+
+### Send one of our URLs
+
+1. On the Xbox, open the M3U or XMLTV URL field so Kodi's on-screen keyboard is visible.
+2. On the PC, from this repository, double-click:
+
+   `tools\kodi-url-helper.cmd`
+
+3. Enter the Xbox/Kodi IP address when asked.
+4. Choose:
+   - `1` = full English generated M3U (recommended),
+   - `2` = generated XMLTV EPG,
+   - `3` = UK-only generated M3U,
+   - `4` = custom text.
+5. The PC sends the full text to Kodi with JSON-RPC `Input.SendText`.
+6. Check the value on the TV and press **OK** on Kodi's keyboard.
+
+The underlying PowerShell helper is `tools/kodi-send-text.ps1`, so it can also be scripted directly. Example:
+
+```powershell
+.\tools\kodi-send-text.ps1 `
+  -KodiIp 192.168.0.50 `
+  -Text "https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u"
+```
+
+If Kodi's HTTP control has authentication enabled, supply `-Username` and `-Password` to the PowerShell helper. Do not expose Kodi's HTTP control port to the public internet; it only needs to be reachable on the home LAN.
+
+For initial IPTV setup this JSON-RPC method is preferred over directly replacing add-on settings files.
+
+## SMB transfer method for files/backups
+
+The PC-to-Kodi SMB workflow remains useful for actual files: keymaps, skin config, logos, backups, and an exported IPTV Simple settings file if we specifically need to inspect it.
+
+### Start the temporary share
 
 From the repository on Windows, double-click:
 
 `tools\start-kodi-transfer.cmd`
 
-Accept the UAC prompt. It launches the PowerShell helper as Administrator and creates the temporary share.
-
-### PowerShell method
-
-Alternatively, open PowerShell **as Administrator** in the repository and run:
+Accept the UAC prompt. Or run elevated PowerShell:
 
 ```powershell
 .\tools\prepare-kodi-transfer.ps1 -CreateShare
@@ -37,76 +69,47 @@ The helper:
 
 - creates `output\kodi-transfer\`;
 - downloads the current generated playlist, guide and diagnostics for inspection;
-- verifies that the downloaded M3Us/guide are real files rather than empty/error responses;
+- verifies the downloaded M3Us/guide are real non-empty files;
 - creates `from-xbox\` and `to-xbox\` folders;
-- prints the most likely LAN IPv4 address and SMB path for Kodi;
-- writes a local `README-XBOX.txt` with the detected PC details;
+- prints the likely LAN IPv4 and SMB path;
+- writes `README-XBOX.txt` with the detected PC details;
 - creates a temporary SMB share named `KodiTransfer` using the current Windows account.
 
-Kodi may ask once for the Windows account credentials. Use the actual Windows/Microsoft-account password rather than a Windows Hello PIN, and let Kodi save it for this temporary share.
+Kodi may ask for Windows credentials. Use the actual Windows/Microsoft-account password rather than a Windows Hello PIN.
 
-The helper does **not** enable insecure guest SMB access, create an anonymous write share, or disable the Windows firewall. If Windows has the home LAN marked **Public**, the helper warns because SMB is commonly blocked on Public profiles; change a trusted home LAN to **Private** rather than disabling the firewall globally.
+The helper does **not** enable guest SMB, create an anonymous write share, or disable the Windows firewall. If the trusted home LAN is marked **Public**, Windows may block SMB; change that trusted network to **Private** rather than disabling the firewall globally.
 
-## 2. Copy the active IPTV Simple settings file to the PC
+### Browse it from Kodi
 
 On Xbox Kodi:
 
 1. Open **Settings → File manager**.
-2. In one pane browse the PC share, e.g. `smb://PC-NAME/KodiTransfer`.
-3. If hostname discovery fails, use the IP path printed by the helper, e.g. `smb://192.168.x.x/KodiTransfer`.
-4. In the other pane browse **Profile directory**, then `addon_data/pvr.iptvsimple/`.
-5. Locate the active `instance-settings-*.xml` file for the configuration we want to keep.
-6. Copy that one file to `KodiTransfer/from-xbox/`.
+2. Browse/add `smb://PC-NAME/KodiTransfer`.
+3. If hostname discovery fails, use the IP form printed by the helper, e.g. `smb://192.168.x.x/KodiTransfer`.
+4. Kodi's **Profile directory** contains its user data, including `addon_data/pvr.iptvsimple/`.
 
-Kodi stores add-on user data under `special://profile/addon_data/`. Do not replace every instance file just because several are present; more than one IPTV Simple configuration was created during testing.
+## Advanced fallback: patch an exported IPTV Simple instance file
 
-## 3. Patch the exported settings on the PC
+Only use this if remote text entry is inconvenient or we specifically want to inspect/backup the add-on settings.
 
-Run:
+1. Copy the active `instance-settings-*.xml` from `Profile directory/addon_data/pvr.iptvsimple/` to `KodiTransfer/from-xbox/`.
+2. On the PC run:
 
 ```powershell
 .\tools\patch-iptvsimple-settings.ps1 .\output\kodi-transfer\from-xbox\instance-settings-N.xml
 ```
 
-The patcher:
+The patcher makes a timestamped backup, preserves unrelated settings, and sets the generated English M3U and XMLTV URLs with caching enabled.
 
-- creates a timestamped backup beside the file;
-- preserves unrelated IPTV Simple settings;
-- switches M3U location to remote URL mode;
-- sets the generated full-English playlist URL;
-- switches EPG location to remote URL mode;
-- sets the generated XMLTV URL;
-- keeps M3U/EPG caching enabled.
+If using this advanced method, patch only the active IPTV Simple instance. Do not blindly replace every `instance-settings-*.xml` file left by earlier test configurations.
 
-If we later decide to use only the UK playlist, run it with:
+## Stop the temporary SMB share
 
-```powershell
-.\tools\patch-iptvsimple-settings.ps1 `
-  .\output\kodi-transfer\from-xbox\instance-settings-N.xml `
-  -PlaylistUrl "https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u"
-```
-
-## 4. Copy the patched file back to Kodi
-
-In Kodi File Manager:
-
-1. Open `KodiTransfer/from-xbox/` in one pane.
-2. Open `Profile directory/addon_data/pvr.iptvsimple/` in the other.
-3. Copy the patched file back over the original file with the same name.
-4. Fully quit Kodi from the Xbox dashboard.
-5. Reopen Kodi and allow PVR Manager to reload.
-
-Then open **TV → Guide**.
-
-The PC is no longer needed once the file is copied back because the saved URLs point at GitHub, not the PC.
-
-## 5. Remove the temporary share
-
-The easy cleanup is to double-click:
+Double-click:
 
 `tools\stop-kodi-transfer.cmd`
 
-Accept the UAC prompt. Or, from an elevated PowerShell, run:
+or run elevated PowerShell:
 
 ```powershell
 .\tools\prepare-kodi-transfer.ps1 -RemoveShare
@@ -114,14 +117,11 @@ Accept the UAC prompt. Or, from an elevated PowerShell, run:
 
 The local transfer folder remains on the PC unless you delete it manually.
 
-## Alternative: manual file-only transfer
+## Recommended division of labour
 
-If we do not want to patch IPTV Simple's XML directly, the SMB share can still be used as a normal file shuttle. Kodi File Manager supports copying files from SMB into the profile directory. This is useful for keymaps, custom images and configuration backups.
+- **Long URL entry:** PC → Kodi JSON-RPC helper.
+- **Files/backups/keymaps/artwork:** temporary SMB share.
+- **Normal live TV + EPG:** Kodi reads GitHub directly; PC off.
+- **Stream-health audit:** optional PC maintenance with `tools/validate_streams.py`.
 
-## Safety rules
-
-- Always keep the patcher's timestamped backup until Kodi has restarted successfully.
-- Patch only the active IPTV Simple instance, not every instance file.
-- Do not make the PC the permanent M3U/EPG host; the generated GitHub files are the always-on source.
-- If Kodi fails after replacing an instance file, restore the `.backup-YYYYMMDD-HHMMSS` copy and restart Kodi.
-- Do not disable the Windows firewall globally just to make SMB work.
+This keeps the Xbox setup convenient without turning the PC into a permanent IPTV server.
