@@ -95,6 +95,37 @@ The backend is no longer the blocker. The next work is Kodi presentation and ser
 
 BBC iPlayer is already working as an add-on on the Xbox, so the next step is menu/library-style integration rather than basic playback setup.
 
+## End-of-day handoff — 2026-09-11
+
+Stop here for tonight. The GitHub/EPG backend is considered complete enough and should not be reopened tomorrow unless Kodi exposes an actual regression.
+
+Known-good state at handoff:
+
+- production EPG pipeline is the fast prebuilt-feed path;
+- current curated English guide contains 352 channels with real programme rows;
+- UK, US, Canada, Australia, New Zealand and India all contribute usable listings;
+- Canada `CA2` namespace support is merged;
+- generated-output verification passed after the Canada build;
+- final documentation/helper cleanup PR was merged;
+- post-merge tests on `main` passed;
+- Windows helpers now default to `curated.m3u` rather than the full English list;
+- stale references to the retired slow EPG chunk-summary workflow were removed;
+- BBC iPlayer is installed and working on Kodi/Xbox;
+- the Sky/Sky-Q-style skin/theme is installed and ready to configure.
+
+Tomorrow's first-session order:
+
+1. confirm Kodi is actually using `curated.m3u` + `guide.xml.gz` and that TV Guide populates correctly;
+2. inspect the installed skin's home-menu customization, widget and submenu controls;
+3. make the TV section feel like the main live-TV hub rather than a generic Kodi menu;
+4. expose BBC iPlayer directly from TV / Videos / Movies using skin shortcuts/widgets instead of making the user browse Add-ons;
+5. decide which iPlayer nodes are useful as direct widgets, e.g. featured/popular, categories, films or programme listings depending on what the add-on exposes;
+6. organise channel numbers/groups/favourites after the basic UI is visually right;
+7. only after that look at ITVX, Channel 4, My5 or other catch-up integrations that are reliable on Xbox Kodi;
+8. finish controller/remote behaviour and visual polish last.
+
+Do not spend the next session trying to increase EPG coverage for zero-match feeds unless a specific wanted channel is missing. The goal from here is a coherent, appliance-like Sky-style Kodi experience.
+
 ## If something looks wrong
 
 Check in this order:
