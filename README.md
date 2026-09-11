@@ -98,15 +98,21 @@ Even hard 404/410 results need repeated consecutive failed validation runs befor
 
 ## PC-assisted Xbox setup
 
-The PC is **not** the permanent IPTV server. It is only used to avoid typing long URLs/controller text on the Xbox and for later maintenance.
+The PC is **not** the permanent IPTV server. It is only a convenient setup/maintenance workstation.
 
-The repository includes:
+For initial M3U/EPG entry, the easiest route is Kodi's supported JSON-RPC remote-input API:
 
-- `tools/prepare-kodi-transfer.ps1` — creates a temporary Windows SMB transfer pack/share;
-- `tools/patch-iptvsimple-settings.ps1` — patches an exported IPTV Simple `instance-settings-*.xml` with the generated M3U and EPG URLs while preserving the rest of the configuration;
-- [`docs/PC_TO_KODI.md`](docs/PC_TO_KODI.md) — the complete copy-out / patch / copy-back procedure.
+- `tools/kodi-url-helper.cmd` — one-click interactive helper for the generated English M3U, EPG, UK-only M3U or arbitrary text;
+- `tools/kodi-send-text.ps1` — direct `Input.SendText` helper for scripted use.
 
-After the patched settings file is copied back into Kodi and Kodi is restarted, the Xbox reads the playlist and guide from GitHub. The PC can be switched off.
+With Kodi's **Allow remote control via HTTP** enabled, open the URL field/on-screen keyboard on Xbox and send the long URL from the PC. The PC does not host anything and can be switched off immediately afterwards.
+
+For actual files and backups, the repo also includes:
+
+- `tools/start-kodi-transfer.cmd` / `tools/stop-kodi-transfer.cmd` — create/remove a temporary Windows SMB share;
+- `tools/prepare-kodi-transfer.ps1` — builds the transfer pack and validates downloaded generated files;
+- `tools/patch-iptvsimple-settings.ps1` — advanced fallback for patching an exported IPTV Simple `instance-settings-*.xml` while preserving unrelated settings;
+- [`docs/PC_TO_KODI.md`](docs/PC_TO_KODI.md) — full PC↔Kodi instructions.
 
 ## Other source references
 
