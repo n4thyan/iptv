@@ -30,10 +30,11 @@ Defaults are intentionally conservative:
 - up to 24 parallel probes,
 - 8 second ffprobe timeout,
 - 2 attempts per stream,
-- ordinary/transient failures need 3 separate validation runs before removal,
-- repeated HTTP 404/410 responses are treated as dead sooner,
+- **all** failed streams need 3 separate validation runs before removal, including repeated HTTP 404/410 results,
 - HTTP 401/403/451 and similar access/geo restrictions are kept,
 - Kodi web-scraper entries are kept because ffprobe cannot test them directly.
+
+A 404/410 is still recorded as a stronger `dead` signal than an ordinary timeout, but it is not enough on its own to delete a stream after one run. This protects against temporarily stale endpoints, CDN changes and short-lived upstream failures.
 
 ## Outputs
 
