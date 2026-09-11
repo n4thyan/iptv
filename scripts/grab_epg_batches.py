@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Run iptv-org/epg over a channels file in resilient, memory-safe batches.
 
-A failed multi-channel batch is retried channel-by-channel.  This keeps one bad
-provider from discarding unrelated guide data and makes the same behaviour
-reusable for primary and alternate-source EPG passes.
+A failed multi-channel batch is retried channel-by-channel.  Retry grabs are
+bounded and parallel so a handful of slow/broken providers cannot turn a full
+English-guide refresh into a multi-hour serial job.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 
@@ -72,6 +73,28 @@ def run_grab(
     return result.returncode
 
 
+def retry_one(
+    epg_root: Path,
+    retry_channels: Path,
+    retry_output: Path,
+    days: int,
+    retry_connections: int,
+    retry_timeout_ms: int,
+) -> tuple[Path, Path, int, bool]:
+    status = run_grab(
+        epg_root,
+        retry_channels.resolve(),
+        retry_output.resolve(),
+        days,
+        retry_connections,
+        retry_timeout_ms,
+    )
+    ok = status == 0 and retry_output.exists() and retry_output.stat().st_size > 0
+    if not ok:
+        retry_output.unlink(missing_ok=True)
+    return retry_channels, retry_output, status, ok
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--channels", required=True)
@@ -84,10 +107,17 @@ def main() -> int:
     parser.add_argument("--chunk-size", type=int, default=20)
     parser.add_argument("--days", type=int, default=2)
     parser.add_argument("--max-connections", type=int, default=4)
-    parser.add_argument("--retry-connections", type=int, default=2)
+    parser.add_argument("--retry-connections", type=int, default=1)
+    parser.add_argument("--retry-workers", type=int, default=6)
     parser.add_argument("--timeout-ms", type=int, default=20000)
+    parser.add_argument("--retry-timeout-ms", type=int, default=10000)
     parser.add_argument("--allow-empty", action="store_true")
     args = parser.parse_args()
+
+    if args.retry_workers < 1:
+        parser.error("--retry-workers must be at least 1")
+    if args.retry_timeout_ms < 1000:
+        parser.error("--retry-timeout-ms must be at least 1000")
 
     channels_path = Path(args.channels).resolve()
     epg_root = Path(args.epg_root).resolve()
@@ -108,6 +138,8 @@ def main() -> int:
             "label": args.label,
             "requested_channels": 0,
             "chunk_size": args.chunk_size,
+            "retry_workers": args.retry_workers,
+            "retry_timeout_ms": args.retry_timeout_ms,
             "successful_primary_chunks": 0,
             "failed_primary_chunks": 0,
             "successful_retry_channels": 0,
@@ -134,6 +166,7 @@ def main() -> int:
     retry_success = 0
     retry_failed = 0
     fragment_count = 0
+    failure_lines: list[str] = []
 
     for channels in chunks:
         chunk = channels.stem.replace(".channels", "")
@@ -154,34 +187,59 @@ def main() -> int:
 
         primary_failed += 1
         output.unlink(missing_ok=True)
-        print(f"{chunk} failed as a batch; retrying each channel separately", flush=True)
         retry_dir = retry_root / chunk
         retry_chunks = split_channels(channels, retry_dir, 1)
+        workers = min(args.retry_workers, len(retry_chunks))
+        print(
+            f"{chunk} failed as a batch; retrying {len(retry_chunks)} channels "
+            f"with {workers} parallel workers",
+            flush=True,
+        )
 
-        for retry_channels in retry_chunks:
-            retry_name = retry_channels.stem.replace(".channels", "")
-            retry_output = output_dir / f"{chunk}-{retry_name}.xml"
-            status = run_grab(
-                epg_root,
-                retry_channels.resolve(),
-                retry_output.resolve(),
-                args.days,
-                args.retry_connections,
-                args.timeout_ms,
-            )
-            if status == 0 and retry_output.exists() and retry_output.stat().st_size > 0:
-                retry_success += 1
-                fragment_count += 1
-            else:
-                retry_failed += 1
-                retry_output.unlink(missing_ok=True)
-                with failures_path.open("a", encoding="utf-8") as handle:
-                    handle.write(f"{chunk}/{retry_name}\texit={status}\n")
+        futures = {}
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            for retry_channels in retry_chunks:
+                retry_name = retry_channels.stem.replace(".channels", "")
+                retry_output = output_dir / f"{chunk}-{retry_name}.xml"
+                future = executor.submit(
+                    retry_one,
+                    epg_root,
+                    retry_channels,
+                    retry_output,
+                    args.days,
+                    args.retry_connections,
+                    args.retry_timeout_ms,
+                )
+                futures[future] = retry_name
+
+            for future in as_completed(futures):
+                retry_name = futures[future]
+                try:
+                    _retry_channels, _retry_output, retry_status, ok = future.result()
+                except Exception as exc:  # keep unrelated guide channels moving
+                    retry_failed += 1
+                    failure_lines.append(f"{chunk}/{retry_name}\texception={exc}")
+                    continue
+
+                if ok:
+                    retry_success += 1
+                    fragment_count += 1
+                else:
+                    retry_failed += 1
+                    failure_lines.append(f"{chunk}/{retry_name}\texit={retry_status}")
+
+    if failure_lines:
+        failures_path.write_text("\n".join(failure_lines) + "\n", encoding="utf-8")
 
     summary = {
         "label": args.label,
         "requested_channels": requested_channels,
         "chunk_size": args.chunk_size,
+        "max_connections": args.max_connections,
+        "timeout_ms": args.timeout_ms,
+        "retry_connections": args.retry_connections,
+        "retry_workers": args.retry_workers,
+        "retry_timeout_ms": args.retry_timeout_ms,
         "successful_primary_chunks": primary_success,
         "failed_primary_chunks": primary_failed,
         "successful_retry_channels": retry_success,
