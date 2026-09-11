@@ -71,6 +71,37 @@ https://cdn.example.com/live.m3u8
         mod.apply_history(result2, previous2, drop_after=3)
         self.assertTrue(result2.drop)
 
+    def test_hard_404_also_requires_history_before_drop(self):
+        result = mod.ProbeResult(
+            key="Example.uk\thttps://example.com/missing.m3u8",
+            name="Example",
+            tvg_id="Example.uk",
+            url="https://example.com/missing.m3u8",
+            status="dead",
+            detail="HTTP 404",
+            attempts=2,
+            elapsed_seconds=2.0,
+        )
+        previous = {result.key: {"consecutive_failures": 1}}
+        mod.apply_history(result, previous, drop_after=3)
+        self.assertEqual(result.consecutive_failures, 2)
+        self.assertFalse(result.drop)
+
+        result2 = mod.ProbeResult(
+            key=result.key,
+            name=result.name,
+            tvg_id=result.tvg_id,
+            url=result.url,
+            status="dead",
+            detail="HTTP 404",
+            attempts=2,
+            elapsed_seconds=2.0,
+        )
+        previous2 = {result.key: {"consecutive_failures": 2}}
+        mod.apply_history(result2, previous2, drop_after=3)
+        self.assertEqual(result2.consecutive_failures, 3)
+        self.assertTrue(result2.drop)
+
     def test_access_restriction_does_not_increment_failure_count(self):
         result = mod.ProbeResult(
             key="Example.uk\thttps://example.com/live.m3u8",
