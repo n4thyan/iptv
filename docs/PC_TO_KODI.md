@@ -17,23 +17,35 @@ This is also useful later for keymaps, skin configuration backups, custom logos,
 
 ## 1. Prepare a temporary Windows share
 
-Open PowerShell **as Administrator** in the repository and run:
+### Easiest method
+
+From the repository on Windows, double-click:
+
+`tools\start-kodi-transfer.cmd`
+
+Accept the UAC prompt. It launches the PowerShell helper as Administrator and creates the temporary share.
+
+### PowerShell method
+
+Alternatively, open PowerShell **as Administrator** in the repository and run:
 
 ```powershell
 .\tools\prepare-kodi-transfer.ps1 -CreateShare
 ```
 
-The script:
+The helper:
 
 - creates `output\kodi-transfer\`;
-- downloads the current generated playlist/guide and diagnostics for inspection;
+- downloads the current generated playlist, guide and diagnostics for inspection;
+- verifies that the downloaded M3Us/guide are real files rather than empty/error responses;
 - creates `from-xbox\` and `to-xbox\` folders;
-- prints the SMB hostname/IP path for Kodi;
+- prints the most likely LAN IPv4 address and SMB path for Kodi;
+- writes a local `README-XBOX.txt` with the detected PC details;
 - creates a temporary SMB share named `KodiTransfer` using the current Windows account.
 
-Kodi may ask once for the Windows account credentials. Let Kodi save them.
+Kodi may ask once for the Windows account credentials. Use the actual Windows/Microsoft-account password rather than a Windows Hello PIN, and let Kodi save it for this temporary share.
 
-The script does **not** enable insecure guest SMB access or open an anonymous write share.
+The helper does **not** enable insecure guest SMB access, create an anonymous write share, or disable the Windows firewall. If Windows has the home LAN marked **Public**, the helper warns because SMB is commonly blocked on Public profiles; change a trusted home LAN to **Private** rather than disabling the firewall globally.
 
 ## 2. Copy the active IPTV Simple settings file to the PC
 
@@ -41,12 +53,12 @@ On Xbox Kodi:
 
 1. Open **Settings → File manager**.
 2. In one pane browse the PC share, e.g. `smb://PC-NAME/KodiTransfer`.
-3. In the other pane browse **Profile directory**, then:
-   `addon_data/pvr.iptvsimple/`
-4. Locate the active `instance-settings-*.xml` file for the configuration we want to keep.
-5. Copy that one file to `KodiTransfer/from-xbox/`.
+3. If hostname discovery fails, use the IP path printed by the helper, e.g. `smb://192.168.x.x/KodiTransfer`.
+4. In the other pane browse **Profile directory**, then `addon_data/pvr.iptvsimple/`.
+5. Locate the active `instance-settings-*.xml` file for the configuration we want to keep.
+6. Copy that one file to `KodiTransfer/from-xbox/`.
 
-Kodi stores add-on user data under `special://profile/addon_data/`. Do not replace every instance file just because several are present; we already created more than one IPTV Simple configuration during testing.
+Kodi stores add-on user data under `special://profile/addon_data/`. Do not replace every instance file just because several are present; more than one IPTV Simple configuration was created during testing.
 
 ## 3. Patch the exported settings on the PC
 
@@ -90,7 +102,11 @@ The PC is no longer needed once the file is copied back because the saved URLs p
 
 ## 5. Remove the temporary share
 
-When finished, from an elevated PowerShell run:
+The easy cleanup is to double-click:
+
+`tools\stop-kodi-transfer.cmd`
+
+Accept the UAC prompt. Or, from an elevated PowerShell, run:
 
 ```powershell
 .\tools\prepare-kodi-transfer.ps1 -RemoveShare
@@ -108,3 +124,4 @@ If we do not want to patch IPTV Simple's XML directly, the SMB share can still b
 - Patch only the active IPTV Simple instance, not every instance file.
 - Do not make the PC the permanent M3U/EPG host; the generated GitHub files are the always-on source.
 - If Kodi fails after replacing an instance file, restore the `.backup-YYYYMMDD-HHMMSS` copy and restart Kodi.
+- Do not disable the Windows firewall globally just to make SMB work.
