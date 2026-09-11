@@ -62,15 +62,13 @@ function Test-DownloadedFile {
         throw "downloaded file was empty"
     }
 
+    if ($Name -like "*.m3u") {
+        $first = Get-Content -LiteralPath $Path -TotalCount 1 -Encoding UTF8
+        if ($first -notmatch '^#EXTM3U') { throw "playlist did not start with #EXTM3U" }
+        return
+    }
+
     switch ($Name) {
-        "english.m3u" {
-            $first = Get-Content -LiteralPath $Path -TotalCount 1 -Encoding UTF8
-            if ($first -notmatch '^#EXTM3U') { throw "playlist did not start with #EXTM3U" }
-        }
-        "uk.m3u" {
-            $first = Get-Content -LiteralPath $Path -TotalCount 1 -Encoding UTF8
-            if ($first -notmatch '^#EXTM3U') { throw "playlist did not start with #EXTM3U" }
-        }
         "guide.xml.gz" {
             $bytes = [IO.File]::ReadAllBytes($Path)
             if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x1f -or $bytes[1] -ne 0x8b) {
@@ -78,6 +76,12 @@ function Test-DownloadedFile {
             }
         }
         "guide-stats.json" {
+            $null = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+        }
+        "curated-playlist-stats.json" {
+            $null = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
+        }
+        "curated-uk-playlist-stats.json" {
             $null = Get-Content -LiteralPath $Path -Raw -Encoding UTF8 | ConvertFrom-Json
         }
     }
@@ -104,13 +108,17 @@ $toXbox = Join-Path $root "to-xbox"
 New-Item -ItemType Directory -Force -Path $root, $fromXbox, $toXbox | Out-Null
 
 $downloads = [ordered]@{
+    "curated.m3u" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u"
+    "curated-uk.m3u" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u"
     "english.m3u" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u"
     "uk.m3u" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u"
     "guide.xml.gz" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz"
     "last-update.txt" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/last-update.txt"
     "guide-stats.json" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/guide-stats.json"
+    "curated-playlist-stats.json" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-playlist-stats.json"
+    "curated-uk-playlist-stats.json" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk-playlist-stats.json"
     "epg-coverage.txt" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-coverage.txt"
-    "epg-chunk-summary.txt" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-chunk-summary.txt"
+    "epg-failures.txt" = "https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-failures.txt"
 }
 
 foreach ($item in $downloads.GetEnumerator()) {
@@ -173,7 +181,7 @@ C. On the PC run from the repository:
       .\tools\patch-iptvsimple-settings.ps1 `
         .\output\kodi-transfer\from-xbox\instance-settings-N.xml
 D. The patcher creates a backup and writes these remote sources into the file:
-      M3U: https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u
+      M3U: https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u
       EPG: https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz
 E. Copy the patched XML back to the same pvr.iptvsimple folder in Kodi, replacing
    the original, then fully quit and reopen Kodi.
@@ -198,9 +206,11 @@ $instructionsPath = Join-Path $root "README-XBOX.txt"
 $instructions | Set-Content -LiteralPath $instructionsPath -Encoding UTF8
 
 $urls = @"
-M3U=https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u
+M3U=https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u
 EPG=https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz
-UK_ONLY_M3U=https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u
+UK_ONLY_M3U=https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u
+FULL_ENGLISH_M3U=https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u
+FULL_UK_M3U=https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u
 "@
 $urls | Set-Content -LiteralPath (Join-Path $toXbox "SOURCE-URLS.txt") -Encoding UTF8
 
