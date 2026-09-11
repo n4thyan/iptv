@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """Build a conservative Kodi-ready playlist from IPTV-org's English M3U.
 
-This script deliberately avoids aggressive stream pruning. A single failed probe is
-not enough evidence that an IPTV stream is dead. For now it:
-
+Current behaviour:
 - downloads the English-language playlist
-- removes adult/18+/XXX entries
-- preserves the original EXTINF metadata and stream URLs
+- removes adult/NSFW channels using IPTV-org's own channel database
+- also applies a small name/group fallback for entries without useful metadata
+- preserves original EXTINF metadata and stream URLs
 - writes the tvg-id set used by the EPG builder
-- writes basic build statistics
+- writes build statistics
+
+This deliberately does NOT delete a stream merely because a single network probe
+fails. Stream validation is kept separate so transient outages/geo-blocks do not
+silently destroy the playlist.
 """
 
 from __future__ import annotations
@@ -20,6 +23,7 @@ import urllib.request
 from pathlib import Path
 
 DEFAULT_SOURCE = "https://iptv-org.github.io/iptv/languages/eng.m3u"
+DEFAULT_CHANNELS_API = "https://iptv-org.github.io/api/channels.json"
 ATTR_RE = re.compile(r'([\w-]+)="([^"]*)"')
 
 EXPLICIT_ADULT_TERMS = {
@@ -39,12 +43,30 @@ EXPLICIT_ADULT_TERMS = {
 }
 
 
-def fetch_text(source: str) -> str:
+def fetch_bytes(source: str) -> bytes:
     if source.startswith(("http://", "https://")):
-        req = urllib.request.Request(source, headers={"User-Agent": "Kodi-IPTV-Cleaner/1.0"})
-        with urllib.request.urlopen(req, timeout=60) as response:
-            return response.read().decode("utf-8-sig", errors="replace")
-    return Path(source).read_text(encoding="utf-8-sig")
+        req = urllib.request.Request(source, headers={"User-Agent": "Kodi-IPTV-Cleaner/1.1"})
+        with urllib.request.urlopen(req, timeout=90) as response:
+            return response.read()
+    return Path(source).read_bytes()
+
+
+def fetch_text(source: str) -> str:
+    return fetch_bytes(source).decode("utf-8-sig", errors="replace")
+
+
+def load_nsfw_ids(source: str) -> set[str]:
+    try:
+        data = json.loads(fetch_bytes(source).decode("utf-8"))
+    except Exception as exc:  # fallback filter still works if API is unavailable
+        print(f"warning: could not load IPTV-org channel metadata: {exc}")
+        return set()
+
+    return {
+        str(channel.get("id", "")).strip()
+        for channel in data
+        if channel.get("is_nsfw") is True and channel.get("id")
+    }
 
 
 def parse_entry(extinf: str, url: str) -> tuple[dict[str, str], str, str]:
@@ -53,8 +75,14 @@ def parse_entry(extinf: str, url: str) -> tuple[dict[str, str], str, str]:
     return attrs, name, url.strip()
 
 
-def is_adult(attrs: dict[str, str], name: str) -> bool:
-    # Do not accidentally remove the unrelated Cartoon Network block "Adult Swim".
+def base_channel_id(tvg_id: str) -> str:
+    # IPTV-org feed IDs can look like Channel.country@FeedVariant. The NSFW flag
+    # belongs to the base channel record before the @ suffix.
+    return tvg_id.split("@", 1)[0].strip()
+
+
+def adult_by_fallback(attrs: dict[str, str], name: str) -> bool:
+    # Cartoon Network's Adult Swim block is not an adult/NSFW channel.
     lowered_name = name.casefold()
     if "adult swim" in lowered_name:
         return False
@@ -67,17 +95,20 @@ def is_adult(attrs: dict[str, str], name: str) -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--source", default=DEFAULT_SOURCE)
+    parser.add_argument("--channels-api", default=DEFAULT_CHANNELS_API)
     parser.add_argument("--output", default="output/english.m3u")
     parser.add_argument("--ids", default="output/channel_ids.txt")
     parser.add_argument("--stats", default="output/playlist-stats.json")
     args = parser.parse_args()
 
+    nsfw_ids = load_nsfw_ids(args.channels_api)
     text = fetch_text(args.source)
     lines = [line.rstrip("\r") for line in text.splitlines()]
 
     output_lines = ["#EXTM3U"]
     tvg_ids: set[str] = set()
     total = kept = removed_adult = malformed = 0
+    removed_by_database = removed_by_fallback = 0
 
     i = 0
     while i < len(lines):
@@ -98,14 +129,20 @@ def main() -> int:
             i += 2
             continue
 
-        if is_adult(attrs, name):
+        tvg_id = attrs.get("tvg-id", "").strip()
+        database_match = bool(tvg_id and base_channel_id(tvg_id) in nsfw_ids)
+        fallback_match = adult_by_fallback(attrs, name)
+        if database_match or fallback_match:
             removed_adult += 1
+            if database_match:
+                removed_by_database += 1
+            elif fallback_match:
+                removed_by_fallback += 1
             i += 2
             continue
 
         output_lines.extend([line, url])
         kept += 1
-        tvg_id = attrs.get("tvg-id", "").strip()
         if tvg_id:
             tvg_ids.add(tvg_id)
 
@@ -125,8 +162,11 @@ def main() -> int:
         "entries_total": total,
         "entries_kept": kept,
         "adult_entries_removed": removed_adult,
+        "adult_removed_by_iptv_org_database": removed_by_database,
+        "adult_removed_by_fallback_filter": removed_by_fallback,
         "malformed_entries_skipped": malformed,
         "unique_tvg_ids": len(tvg_ids),
+        "iptv_org_nsfw_ids_loaded": len(nsfw_ids),
     }
     stats_path.write_text(json.dumps(stats, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(stats, indent=2))
