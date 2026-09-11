@@ -1,41 +1,59 @@
-# Net IPTV playlist pack
+# IPTV / Kodi playlist project
 
-Built for the older Samsung **Net IPTV / netiptv.eu** app.
+Clean IPTV source list and maintenance notes for Nathan's Kodi setup.
 
-## Recommended four-list layout
+## Current setup
 
-| Slot | Purpose | URL |
-|---|---|---|
-| 1 | UK | `https://iptv-org.github.io/iptv/countries/uk.m3u` |
-| 2 | Western Europe | `https://iptv-org.github.io/iptv/regions/wer.m3u` |
-| 3 | English-language worldwide | `https://iptv-org.github.io/iptv/languages/eng.m3u` |
-| 4 | Adult / call-in / participation extras | `https://raw.githubusercontent.com/n4thyan/iptv/main/netiptv-extras-adult-callin.m3u` |
+The main working frontend is **Kodi on Xbox** using **PVR IPTV Simple Client**.
 
-## Adult / call-in extras
+Current public playlist sources:
 
-The custom list currently contains 32 entries, including Xpanded TV, Babestation24, VISIT-X TV, Miami TV variants, A3 Bikini, FashionTV Midnight Secrets and public AdultIPTV.net category feeds.
+| Purpose | URL |
+|---|---|
+| UK | `https://iptv-org.github.io/iptv/countries/uk.m3u` |
+| Western Europe | `https://iptv-org.github.io/iptv/regions/wer.m3u` |
+| English-language worldwide | `https://iptv-org.github.io/iptv/languages/eng.m3u` |
 
-The ambiguous `AdultIPTV.net Teen` feed is intentionally not included.
+The English-language worldwide list is currently the main source because it gives broad coverage and is already working in Kodi.
 
-The list does **not** contain leaked Xtream credentials, subscription usernames/passwords or private paid IPTV accounts.
+## Removed sources
 
-## Samsung / Net IPTV setup
+The old custom adult/call-in playlist has been removed because the streams were not working reliably. It should not be re-added unless there is a validated reason to do so.
 
-1. Open `https://netiptv.eu/home/upload`.
-2. Enter the MAC / APP ID shown by Net IPTV on the Samsung TV.
-3. Paste the four URLs above into List 1–4.
-4. Click **Add ALL List**.
-5. Re-open Net IPTV on the TV, or press `0` to request a playlist reload.
-6. The adult streams should appear under the `07 Adult 18+` group and the participation channels under `06 Call-in & Participation`.
+## EPG status
 
-If the large English-language playlist makes the older Samsung app sluggish, replace List 3 with:
+Kodi's EPG UI is working, but guide data still needs to be matched correctly to the playlist channel IDs. The previous direct UK XMLTV test did not populate the UK playlist consistently because the channel identifiers did not match.
 
-`https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8`
+The intended fix is to build a small maintenance pipeline that:
 
-## EPG
+1. downloads the source playlist(s),
+2. preserves `tvg-id`, channel name, logo and group metadata,
+3. matches channels to compatible XMLTV/EPG data by ID,
+4. validates streams without deleting them after a single transient failure,
+5. removes confirmed dead streams and bad duplicates,
+6. outputs a cleaned Kodi-ready M3U and XMLTV guide.
 
-The IPTV-org lists include `tvg-id` metadata that can be matched against XMLTV data. The custom list keeps known `tvg-id` values where available, but conventional programme-guide coverage is expected to be limited for many adult/call-in streams.
+## Stream validation policy
+
+Do not treat one failed request as proof that a channel is dead. IPTV streams can be temporarily unavailable, geo-blocked or reject certain probe methods while still playing in Kodi.
+
+A cleaner should classify streams before removal, for example:
+
+- working
+- geo-blocked / access-restricted
+- temporarily failed
+- confirmed dead
+
+Only confirmed dead streams should be removed automatically.
+
+## Next priorities
+
+- Get reliable UK EPG matching working.
+- Add automated stream validation and deduplication.
+- Generate a cleaner playlist for Kodi rather than manually editing thousands of channels.
+- Preserve useful channel groups and make UK/favourite channels easy to reach.
+- Keep the setup lightweight: no random Kodi builds or unnecessary repositories.
 
 ## Notes
 
-Public IPTV streams are volatile. Individual streams can move, disappear, become geo-blocked, or stop working without warning. The next refinement pass can add more public sources, validate current reachability, deduplicate channels and improve EPG coverage.
+Public IPTV streams are volatile. Individual streams can move, disappear, become geo-blocked or return later, so generated playlists should be refreshable rather than treated as permanent static data.
