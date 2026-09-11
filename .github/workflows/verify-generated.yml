@@ -35,20 +35,24 @@ jobs:
           import xml.etree.ElementTree as ET
           from pathlib import Path
 
-          playlist = Path("english.m3u")
+          english = Path("english.m3u")
+          uk = Path("uk.m3u")
           guide = Path("guide.xml.gz")
           coverage = Path("epg-coverage.txt")
           playlist_stats_path = Path("playlist-stats.json")
+          uk_stats_path = Path("uk-playlist-stats.json")
           guide_stats_path = Path("guide-stats.json")
           chunk_summary = Path("epg-chunk-summary.txt")
           failures = Path("epg-failures.txt")
           update = Path("last-update.txt")
 
           required = [
-              playlist,
+              english,
+              uk,
               guide,
               coverage,
               playlist_stats_path,
+              uk_stats_path,
               guide_stats_path,
               chunk_summary,
               failures,
@@ -59,20 +63,35 @@ jobs:
               raise SystemExit(f"missing generated files: {', '.join(missing)}")
           empty_required = [
               str(path)
-              for path in [playlist, guide, coverage, playlist_stats_path, guide_stats_path, chunk_summary, update]
+              for path in [
+                  english,
+                  uk,
+                  guide,
+                  coverage,
+                  playlist_stats_path,
+                  uk_stats_path,
+                  guide_stats_path,
+                  chunk_summary,
+                  update,
+              ]
               if path.stat().st_size == 0
           ]
           if empty_required:
               raise SystemExit(f"empty generated files: {', '.join(empty_required)}")
 
-          text = playlist.read_text(encoding="utf-8-sig")
-          if not text.startswith("#EXTM3U"):
-              raise SystemExit("english.m3u does not start with #EXTM3U")
-          if "x-tvg-url=" not in text.splitlines()[0]:
-              raise SystemExit("english.m3u is missing its embedded EPG URL")
-          playlist_channels = sum(1 for line in text.splitlines() if line.startswith("#EXTINF"))
-          if playlist_channels < 1000:
-              raise SystemExit(f"playlist unexpectedly small: {playlist_channels} channels")
+          def playlist_count(path: Path, minimum: int) -> int:
+              text = path.read_text(encoding="utf-8-sig")
+              if not text.startswith("#EXTM3U"):
+                  raise SystemExit(f"{path} does not start with #EXTM3U")
+              if "x-tvg-url=" not in text.splitlines()[0]:
+                  raise SystemExit(f"{path} is missing its embedded EPG URL")
+              count = sum(1 for line in text.splitlines() if line.startswith("#EXTINF"))
+              if count < minimum:
+                  raise SystemExit(f"{path} unexpectedly small: {count} channels")
+              return count
+
+          english_channels = playlist_count(english, 1000)
+          uk_channels = playlist_count(uk, 10)
 
           with gzip.open(guide, "rb") as handle:
               root = ET.parse(handle).getroot()
@@ -91,9 +110,14 @@ jobs:
               )
 
           playlist_stats = json.loads(playlist_stats_path.read_text(encoding="utf-8"))
-          if int(playlist_stats.get("entries_kept", 0)) != playlist_channels:
+          if int(playlist_stats.get("entries_kept", 0)) != english_channels:
               raise SystemExit(
-                  "playlist-stats.json entries_kept does not match the generated M3U"
+                  "playlist-stats.json entries_kept does not match english.m3u"
+              )
+          uk_stats = json.loads(uk_stats_path.read_text(encoding="utf-8"))
+          if int(uk_stats.get("entries_kept", 0)) != uk_channels:
+              raise SystemExit(
+                  "uk-playlist-stats.json entries_kept does not match uk.m3u"
               )
 
           guide_stats = json.loads(guide_stats_path.read_text(encoding="utf-8"))
@@ -108,7 +132,8 @@ jobs:
           if "matched EPG ids:" not in coverage_text or "UNMATCHED IDS" not in coverage_text:
               raise SystemExit("EPG coverage report is incomplete")
 
-          print(f"playlist_channels={playlist_channels}")
+          print(f"english_playlist_channels={english_channels}")
+          print(f"uk_playlist_channels={uk_channels}")
           print(f"guide_channels={guide_channels}")
           print(f"channels_with_programmes={len(programme_channels)}")
           print(f"programmes={programmes}")
