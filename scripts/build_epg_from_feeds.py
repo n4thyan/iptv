@@ -2,9 +2,9 @@
 """Build a fast Kodi XMLTV guide from prebuilt feeds.
 
 EPG providers and IPTV-org often describe the same channel with different ID
-punctuation (for example ``Channel.4.HD.uk`` vs ``Channel4.uk@UKHD``).  This
-builder first honours exact IDs, then uses a deliberately conservative,
-country-aware compatibility key. Compatible source rows are rewritten to the
+punctuation (for example ``Channel.4.HD.uk`` vs ``Channel4.uk@UKHD``). This
+builder first honours exact IDs, then uses deliberately conservative,
+country-aware compatibility keys. Compatible source rows are rewritten to the
 *exact* IPTV-org tvg-id values used by the playlist so Kodi can join the guide
 without manual channel mapping.
 """
@@ -24,9 +24,20 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
 
-USER_AGENT = "Kodi-IPTV-EPG-Builder/2.2"
+USER_AGENT = "Kodi-IPTV-EPG-Builder/2.3"
 QUALITY_SUFFIXES = ("uhd", "fhd", "hd", "sd")
 NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+
+# Some EPGShare datasets encode the dataset name into the final ID suffix
+# instead of using a plain ISO country code. Normalize only explicit known
+# aliases so the matcher remains country-safe rather than broadly fuzzy.
+COUNTRY_ALIASES = {
+    "us1": "us",
+    "us2": "us",
+    "uslocals1": "us",
+    "uslocals2": "us",
+    "ussports1": "us",
+}
 
 # Common UK regional abbreviations used by EPGShare. These are deliberately
 # explicit rather than fuzzy so a regional schedule cannot silently jump to a
@@ -105,12 +116,13 @@ def playlist_base_id(identifier: str) -> str:
 
 
 def split_country_id(identifier: str) -> tuple[str, str] | None:
-    """Return (stem, country) for Channel.Name.uk-style IDs."""
+    """Return (stem, normalized country) for Channel.Name.uk-style IDs."""
     base = playlist_base_id(identifier)
     if "." not in base:
         return None
     stem, country = base.rsplit(".", 1)
     country = NON_ALNUM_RE.sub("", country.casefold())
+    country = COUNTRY_ALIASES.get(country, country)
     if not stem or not country:
         return None
     return stem, country
@@ -174,7 +186,7 @@ def build_target_index(
             index[(country, base_stem)][base_id].add(target_id)
 
         # Feed-specific keys handle regional sources such as
-        # BBC.One.Lon.HD.uk -> BBCOne.uk@London/ LondonHD.
+        # BBC.One.Lon.HD.uk -> BBCOne.uk@London / LondonHD.
         primary_base = base_stems[-1]
         for feed in feed_variants(target_id):
             index[(country, primary_base + feed)][base_id].add(target_id)
@@ -424,7 +436,10 @@ def main() -> int:
 
     if not programmes:
         failures_path.parent.mkdir(parents=True, exist_ok=True)
-        failures_path.write_text(("\n".join(failures) + "\n") if failures else "", encoding="utf-8")
+        failures_path.write_text(
+            ("\n".join(failures) + "\n") if failures else "",
+            encoding="utf-8",
+        )
         raise SystemExit("no programme data matched the playlist IDs")
 
     write_guide(output_path, channel_elements, programmes, programmed_ids)
