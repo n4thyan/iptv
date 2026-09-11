@@ -2,6 +2,8 @@
 
 Clean IPTV source, EPG generation and maintenance tooling for a Kodi-on-Xbox setup.
 
+For the quickest current-state handoff, see [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md).
+
 ## Main Kodi source
 
 The main playlist is IPTV-org's English-language worldwide list:
