@@ -41,13 +41,14 @@ The GitHub Actions workflow:
 2. removes adult/NSFW entries using IPTV-org channel metadata plus a conservative fallback filter,
 3. preserves `tvg-id`, logos, existing channel groups, stream URLs and Kodi/VLC stream directives,
 4. tags English-playlist entries that also exist in the UK country feed with the extra `UK` group,
-5. scans IPTV-org's EPG definitions for matching channel IDs,
-6. uses same-channel feed aliases when appropriate to improve coverage,
-7. splits the large EPG job into small memory-safe batches,
-8. retries any failed batch channel-by-channel so one bad upstream source does not discard the other good channels in that batch,
-9. downloads programme data for two days,
-10. merges the successful XMLTV fragments and produces guide statistics,
-11. validates and publishes the finished files to the `generated` branch.
+5. builds a compact channel metadata catalog from IPTV-org names and aliases,
+6. maps EPG sources by exact `xmltv_id`, safe same-channel feed aliases, then safe **unique exact-name** matches for upstream definitions whose `xmltv_id` is blank,
+7. records every ranked alternate guide source for each channel,
+8. downloads the first-choice guide in small memory-safe batches,
+9. retries failed batches channel-by-channel,
+10. detects channels that still have no programmes and runs up to two additional passes using their next-ranked EPG providers,
+11. merges all successful XMLTV fragments and produces guide statistics,
+12. validates and publishes the finished files to the `generated` branch.
 
 A second Actions workflow verifies the published branch after a successful generation run by reopening the compressed XMLTV guide, checking both playlists, verifying the generated UK group and cross-checking the generated statistics.
 
@@ -57,11 +58,21 @@ The generation workflow runs daily and can also be started manually. A failed ge
 
 The target is the **entire English playlist**, not just UK channels. IPTV-org's EPG tooling is the primary source because its `xmltv_id` identifiers align with the `tvg-id` values used by the IPTV-org playlist.
 
-Not every public IPTV channel has real schedule data available. The build therefore produces `epg-coverage.txt` showing exact matches, safe same-channel aliases and channels for which no compatible EPG source is currently known. Missing guide data is not fabricated.
+Coverage is intentionally conservative. The build now uses three mapping levels:
 
-If an EPG source crashes or exhausts memory, the build records the isolated failures in `epg-failures.txt` rather than failing the entire guide. `epg-chunk-summary.txt` records primary and retry results, while `guide-stats.json` records how many XMLTV channels and programmes actually reached the finished guide.
+- exact playlist/EPG IDs;
+- another feed belonging to the same IPTV-org base channel;
+- an EPG definition with a blank `xmltv_id` only when its normalized channel name exactly matches one unique IPTV-org name/alias in our playlist and that base channel has only one playlist feed.
 
-`XMLTV/xmltv` is also useful and is documented as a possible second-stage toolkit for filtering, merging or augmenting listings if we need to push coverage further.
+It does **not** fuzzy-match vaguely similar channel names or copy a generic schedule across several regional variants. Wrong guide data is worse than a blank row.
+
+The ranked source manifest also lets the build try alternate providers when the first correctly-mapped provider returns no programmes. Two fallback passes are attempted before a channel is left blank.
+
+Not every public IPTV channel has real schedule data available. The build therefore produces `epg-coverage.txt` showing exact matches, safe same-channel aliases, safe name-based mappings and channels for which no compatible source is known. Missing guide data is not fabricated.
+
+If an EPG source crashes or exhausts memory, the build records isolated failures in `epg-failures.txt` rather than failing the entire guide. `epg-chunk-summary.txt` records primary/fallback selection and retry results, while `guide-stats.json` records how many XMLTV channels and programmes actually reached the finished guide.
+
+The `XMLTV/xmltv` project remains useful as a standards/tooling reference for sorting, filtering, checking and merging XMLTV data, but it is not itself a universal listings database. The current generator therefore prioritizes real mapped guide providers rather than treating XMLTV tooling as a source of programme data.
 
 See [`docs/EPG.md`](docs/EPG.md) for the architecture and [`docs/KODI_SETUP.md`](docs/KODI_SETUP.md) for the Xbox setup.
 
@@ -85,6 +96,18 @@ It classifies streams as:
 
 Even hard 404/410 results need repeated consecutive failed validation runs before removal. A working, restricted or deliberately untested result breaks that failure streak. See [`docs/STREAM_VALIDATION.md`](docs/STREAM_VALIDATION.md).
 
+## PC-assisted Xbox setup
+
+The PC is **not** the permanent IPTV server. It is only used to avoid typing long URLs/controller text on the Xbox and for later maintenance.
+
+The repository includes:
+
+- `tools/prepare-kodi-transfer.ps1` — creates a temporary Windows SMB transfer pack/share;
+- `tools/patch-iptvsimple-settings.ps1` — patches an exported IPTV Simple `instance-settings-*.xml` with the generated M3U and EPG URLs while preserving the rest of the configuration;
+- [`docs/PC_TO_KODI.md`](docs/PC_TO_KODI.md) — the complete copy-out / patch / copy-back procedure.
+
+After the patched settings file is copied back into Kodi and Kodi is restarted, the Xbox reads the playlist and guide from GitHub. The PC can be switched off.
+
 ## Other source references
 
 | Purpose | URL |
@@ -104,7 +127,7 @@ After import, the source categories remain available and the generated **UK** gr
 
 If the full worldwide list feels too large, switch only the M3U URL to generated `uk.m3u`; it uses the same guide URL.
 
-The PC is not required for normal playback or EPG use. It is only needed for development and optional local stream-health audits.
+The PC is not required for normal playback or EPG use. It is only needed for setup, development and optional local stream-health audits.
 
 ## Project philosophy
 
