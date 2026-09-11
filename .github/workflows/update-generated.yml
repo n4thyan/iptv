@@ -1,0 +1,88 @@
+name: Build Kodi playlist and EPG
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: iptv-generated
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+
+    steps:
+      - name: Check out project
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Build cleaned English playlist
+        run: python scripts/build_playlist.py
+
+      - name: Check out IPTV-org EPG tooling
+        run: git clone --depth 1 --branch master https://github.com/iptv-org/epg.git vendor/epg
+
+      - name: Install EPG grabber dependencies
+        working-directory: vendor/epg
+        env:
+          HUSKY: "0"
+        run: npm ci
+
+      - name: Match playlist IDs to EPG sources
+        run: >-
+          python scripts/build_epg_channels.py
+          --ids output/channel_ids.txt
+          --sites-root vendor/epg/sites
+          --output output/epg.channels.xml
+          --coverage output/epg-coverage.txt
+
+      - name: Grab programme guide
+        working-directory: vendor/epg
+        run: >-
+          npm run grab --
+          --channels="${{ github.workspace }}/output/epg.channels.xml"
+          --output="${{ github.workspace }}/output/guide.xml"
+          --days=2
+          --maxConnections=8
+          --timeout=20000
+
+      - name: Compress guide
+        run: gzip -9 -c output/guide.xml > output/guide.xml.gz
+
+      - name: Prepare generated branch
+        run: |
+          mkdir -p publish
+          cp output/english.m3u publish/english.m3u
+          cp output/guide.xml.gz publish/guide.xml.gz
+          cp output/epg-coverage.txt publish/epg-coverage.txt
+          cp output/playlist-stats.json publish/playlist-stats.json
+          printf 'Generated: %s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" > publish/last-update.txt
+
+      - name: Publish generated files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd publish
+          git init
+          git checkout -b generated
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          git commit -m "Refresh Kodi playlist and EPG"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin generated
