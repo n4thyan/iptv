@@ -96,6 +96,7 @@ def parse_source(
                 if channel_id in requested_ids and channel_id not in channel_elements:
                     channel_elements[channel_id] = clone_element(element)
                     kept_channels += 1
+                element.clear()
             elif tag == "programme":
                 channel_id = element.attrib.get("channel", "").strip()
                 if channel_id in requested_ids:
@@ -110,7 +111,7 @@ def parse_source(
                         programmes.append(clone_element(element))
                         programmed_ids.add(channel_id)
                         kept_programmes += 1
-            element.clear()
+                element.clear()
 
     return {"channels": kept_channels, "programmes": kept_programmes}
 
@@ -264,7 +265,11 @@ def main() -> int:
         "requested_playlist_ids": len(requested_ids),
         "sources_configured": len(sources),
         "sources_downloaded": sum(1 for item in source_stats if item.get("downloaded")),
-        "sources_failed": sum(1 for item in source_stats if not item.get("downloaded") or item.get("parse_error")),
+        "sources_failed": sum(
+            1
+            for item in source_stats
+            if not item.get("downloaded") or item.get("parse_error")
+        ),
         "channel_elements": len(programmed_ids),
         "programme_elements": len(programmes),
         "channels_with_programmes": len(programmed_ids),
