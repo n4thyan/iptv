@@ -16,27 +16,43 @@ spec.loader.exec_module(mod)
 
 
 class FastEpgBuilderTests(unittest.TestCase):
-    def test_parse_source_keeps_only_requested_ids_and_deduplicates_programmes(self):
+    def test_compatibility_bridge_rewrites_dotted_hd_id_to_playlist_variants(self):
+        requested = {"Channel4.uk@UK", "Channel4.uk@UKHD"}
+        index = mod.build_target_index(requested)
+        targets, mode = mod.targets_for_source_id("Channel.4.HD.uk", requested, index)
+        self.assertEqual(mode, "compatible")
+        self.assertEqual(targets, ["Channel4.uk@UK", "Channel4.uk@UKHD"])
+
+    def test_compatibility_bridge_is_country_aware(self):
+        requested = {"Channel4.uk@UK"}
+        index = mod.build_target_index(requested)
+        targets, mode = mod.targets_for_source_id("Channel.4.HD.us", requested, index)
+        self.assertEqual(mode, "unmatched")
+        self.assertEqual(targets, [])
+
+    def test_parse_source_preserves_metadata_and_deduplicates_programmes(self):
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "sample.xml.gz"
             xml = b'''<?xml version="1.0" encoding="UTF-8"?>
 <tv>
-  <channel id="BBCOne.uk"><display-name>BBC One</display-name></channel>
+  <channel id="Channel.4.HD.uk"><display-name>Channel 4 HD</display-name></channel>
   <channel id="Other.us"><display-name>Other</display-name></channel>
-  <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="BBCOne.uk"><title>News</title><desc>Latest headlines.</desc></programme>
-  <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="BBCOne.uk"><title>News</title><desc>Latest headlines.</desc></programme>
+  <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="Channel.4.HD.uk"><title>News</title><desc>Latest headlines.</desc></programme>
+  <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="Channel.4.HD.uk"><title>News</title><desc>Latest headlines.</desc></programme>
   <programme start="20260911120000 +0000" stop="20260911130000 +0000" channel="Other.us"><title>Other</title></programme>
 </tv>'''
             with gzip.open(source, "wb") as handle:
                 handle.write(xml)
 
+            requested = {"Channel4.uk@UKHD"}
             channels = {}
             programmes = []
             seen = set()
             programmed = set()
             stats = mod.parse_source(
                 source,
-                {"BBCOne.uk"},
+                requested,
+                mod.build_target_index(requested),
                 channels,
                 programmes,
                 seen,
@@ -45,10 +61,13 @@ class FastEpgBuilderTests(unittest.TestCase):
 
             self.assertEqual(stats["channels"], 1)
             self.assertEqual(stats["programmes"], 1)
-            self.assertEqual(programmed, {"BBCOne.uk"})
+            self.assertEqual(stats["compatible_source_ids"], 1)
+            self.assertEqual(programmed, {"Channel4.uk@UKHD"})
             self.assertEqual(len(programmes), 1)
-            self.assertIn("BBCOne.uk", channels)
-            self.assertEqual(channels["BBCOne.uk"].findtext("display-name"), "BBC One")
+            self.assertIn("Channel4.uk@UKHD", channels)
+            self.assertEqual(channels["Channel4.uk@UKHD"].attrib["id"], "Channel4.uk@UKHD")
+            self.assertEqual(channels["Channel4.uk@UKHD"].findtext("display-name"), "Channel 4 HD")
+            self.assertEqual(programmes[0].attrib["channel"], "Channel4.uk@UKHD")
             self.assertEqual(programmes[0].findtext("title"), "News")
             self.assertEqual(programmes[0].findtext("desc"), "Latest headlines.")
 
