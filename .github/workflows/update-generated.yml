@@ -2,6 +2,13 @@ name: Build Kodi playlist and EPG
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/**"
+      - ".github/workflows/update-generated.yml"
+      - "README.md"
   schedule:
     - cron: "17 4 * * *"
 
