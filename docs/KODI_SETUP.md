@@ -2,22 +2,23 @@
 
 These steps are for the generated playlist/EPG, not the raw upstream URLs.
 
-## Recommended setup method: use the PC as a one-time transfer/patch tool
+## Recommended setup method: type the URLs from the PC
 
 You do **not** need to type the long GitHub URLs with the Xbox controller.
 
-Use [`PC_TO_KODI.md`](PC_TO_KODI.md). The easiest Windows flow is:
+Use [`PC_TO_KODI.md`](PC_TO_KODI.md). For initial IPTV setup the easiest/safest Windows flow is:
 
-1. double-click `tools\start-kodi-transfer.cmd` and accept the UAC prompt;
-2. copy the active IPTV Simple `instance-settings-*.xml` file from Kodi to the temporary PC share;
-3. patch the M3U and XMLTV URLs on the PC with `tools/patch-iptvsimple-settings.ps1`;
-4. copy the same XML file back to Kodi;
-5. fully restart Kodi;
-6. when finished, double-click `tools\stop-kodi-transfer.cmd` to remove the temporary share.
+1. on Kodi enable **Settings → Services → Control → Allow remote control via HTTP**;
+2. open the M3U URL field so Kodi's on-screen keyboard is visible;
+3. on the PC double-click `tools\kodi-url-helper.cmd`, enter the Xbox IP and choose the English M3U;
+4. repeat with the EPG URL field and choose the XMLTV EPG;
+5. save the IPTV Simple configuration and fully restart Kodi.
 
-The saved URLs still point at GitHub, so the PC can be switched off afterwards.
+The helper uses Kodi's supported JSON-RPC `Input.SendText` method. Nothing is hosted by the PC, so it can be switched off afterwards.
 
-The manual settings below are useful for checking what the patched file is supposed to contain.
+For actual file transfers/backups later, the repo also includes `tools\start-kodi-transfer.cmd` / `tools\stop-kodi-transfer.cmd` for a temporary Windows SMB share. Direct editing of IPTV Simple's `instance-settings-*.xml` is retained only as an advanced fallback.
+
+The manual settings below show exactly what Kodi should contain.
 
 ## 1. Open IPTV Simple Client
 
@@ -105,7 +106,7 @@ For a systematic cleanup from the same network as the Xbox, use the local valida
 
 ## 8. PC transfer/maintenance uses later
 
-The same temporary SMB path can be used later for:
+The temporary SMB path can be used later for:
 
 1. backing up IPTV Simple instance settings,
 2. copying controller/remote keymaps,
@@ -113,11 +114,7 @@ The same temporary SMB path can be used later for:
 4. exporting Kodi config files for editing on the PC,
 5. restoring known-good files after testing.
 
-Remove the temporary share when finished with `tools\stop-kodi-transfer.cmd`, or from elevated PowerShell with:
-
-```powershell
-.\tools\prepare-kodi-transfer.ps1 -RemoveShare
-```
+Start it with `tools\start-kodi-transfer.cmd` and remove it when finished with `tools\stop-kodi-transfer.cmd`.
 
 ## 9. What still belongs on the Kodi side
 
