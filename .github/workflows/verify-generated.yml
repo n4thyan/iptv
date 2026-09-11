@@ -1,0 +1,83 @@
+name: Verify generated Kodi files
+
+on:
+  workflow_run:
+    workflows:
+      - Build Kodi playlist and EPG
+    types:
+      - completed
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out generated branch
+        uses: actions/checkout@v4
+        with:
+          ref: generated
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Verify playlist and XMLTV guide
+        run: |
+          python - <<'PY'
+          import gzip
+          import json
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          playlist = Path("english.m3u")
+          guide = Path("guide.xml.gz")
+          coverage = Path("epg-coverage.txt")
+          stats_path = Path("playlist-stats.json")
+          update = Path("last-update.txt")
+
+          required = [playlist, guide, coverage, stats_path, update]
+          missing = [str(path) for path in required if not path.is_file() or path.stat().st_size == 0]
+          if missing:
+              raise SystemExit(f"missing/empty generated files: {', '.join(missing)}")
+
+          text = playlist.read_text(encoding="utf-8-sig")
+          if not text.startswith("#EXTM3U"):
+              raise SystemExit("english.m3u does not start with #EXTM3U")
+          if "x-tvg-url=" not in text.splitlines()[0]:
+              raise SystemExit("english.m3u is missing its embedded EPG URL")
+          playlist_channels = sum(1 for line in text.splitlines() if line.startswith("#EXTINF"))
+          if playlist_channels < 1000:
+              raise SystemExit(f"playlist unexpectedly small: {playlist_channels} channels")
+
+          with gzip.open(guide, "rb") as handle:
+              root = ET.parse(handle).getroot()
+          if root.tag != "tv":
+              raise SystemExit(f"guide root is {root.tag!r}, expected 'tv'")
+          guide_channels = len(root.findall("channel"))
+          programmes = len(root.findall("programme"))
+          if guide_channels < 1 or programmes < 1:
+              raise SystemExit(
+                  f"guide has insufficient data: {guide_channels} channels, {programmes} programmes"
+              )
+
+          stats = json.loads(stats_path.read_text(encoding="utf-8"))
+          if int(stats.get("entries_kept", 0)) != playlist_channels:
+              raise SystemExit(
+                  "playlist-stats.json entries_kept does not match the generated M3U"
+              )
+
+          coverage_text = coverage.read_text(encoding="utf-8", errors="replace")
+          if "matched EPG ids:" not in coverage_text or "UNMATCHED IDS" not in coverage_text:
+              raise SystemExit("EPG coverage report is incomplete")
+
+          print(f"playlist_channels={playlist_channels}")
+          print(f"guide_channels={guide_channels}")
+          print(f"programmes={programmes}")
+          print(update.read_text(encoding="utf-8").strip())
+          PY
