@@ -1,0 +1,23 @@
+# Fast prebuilt XMLTV feeds used by the production Kodi guide.
+# Keep this list intentionally curated: broad English-language coverage plus
+# the Western-European countries Nathan actually wants available in Kodi.
+https://epgshare01.online/epgshare01/epg_ripper_UK1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_IE1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_US1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_US_LOCALS2.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_US_SPORTS1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_CA1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_AU1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_NZ1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_ZA1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_IN4.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_SG1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_FR1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_NL1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_DISTROTV1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_PLEX1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_RAKUTEN_EN1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_SAMSUNG1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_ALJAZEERA1.xml.gz
+https://epgshare01.online/epgshare01/epg_ripper_VOA1.xml.gz
