@@ -6,11 +6,15 @@ Provide one programme guide for the cleaned English-language playlist used by Ko
 
 The generated files live on the repository's `generated` branch and are refreshed automatically by GitHub Actions.
 
-Once the first successful build has populated that branch, Kodi can use these directly:
+Kodi can use these directly:
 
-- M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u`
+- full English M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u`
+- optional UK-only M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u`
 - XMLTV EPG: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
 - coverage report: `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-coverage.txt`
+- finished guide stats: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide-stats.json`
+- EPG batch/retry summary: `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-chunk-summary.txt`
+- isolated EPG failures: `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-failures.txt`
 
 The PC is therefore only needed for development/maintenance and optional stream-health audits, not for normal Kodi playback.
 
@@ -36,24 +40,28 @@ This avoids adding a second toolchain before it is actually needed.
 
 ## Current generation pipeline
 
-1. Download `https://iptv-org.github.io/iptv/languages/eng.m3u`.
+1. Download the IPTV-org English playlist and, separately, the smaller UK playlist.
 2. Download IPTV-org channel metadata.
 3. Remove channels marked NSFW/adult by IPTV-org plus a small conservative fallback filter.
 4. Preserve the remaining channel metadata, stream URLs, `tvg-id` values and Kodi/VLC stream directives.
-5. Scan `iptv-org/epg` channel definitions for compatible `xmltv_id` values.
+5. Scan `iptv-org/epg` channel definitions for compatible `xmltv_id` values required by the full English playlist.
 6. Prefer an English-language guide source where multiple sources are available.
 7. Use a same-channel feed alias where it is safe and useful.
-8. Build one custom `epg.channels.xml` describing only the channels required by our playlist.
-9. Split that large request into small channel batches. The upstream Node grabber exhausted its default heap when all ~1.4k matched channels were queued in one process, so chunking resets memory between batches.
-10. Grab two days of schedule data for each batch. A failed batch is recorded rather than destroying successful output from every other batch.
-11. Merge all valid XMLTV fragments into one `guide.xml`.
-12. Validate that the final guide contains actual `<programme>` records, gzip it and publish it alongside the cleaned M3U.
+8. Build one custom `epg.channels.xml` describing only matched channels.
+9. Split the request into 20-channel primary batches. This keeps each Node grabber process small enough to avoid the heap exhaustion seen when much larger jobs were queued.
+10. Grab two days of schedule data for each primary batch.
+11. If a primary batch fails, split that exact batch into one-channel requests and retry them independently. A single broken provider/channel can therefore be isolated without throwing away the other channels from the batch.
+12. Record the final isolated failures in `epg-failures.txt` and batch/retry totals in `epg-chunk-summary.txt`.
+13. Merge all successful XMLTV fragments into one `guide.xml`.
+14. Produce `guide-stats.json` from the merged guide, including XMLTV channel and programme counts.
+15. Validate the playlists and guide, gzip the XMLTV and publish everything to `generated`.
+16. After a successful build, a separate verification workflow checks out the published `generated` branch, reopens the gzip guide, validates both M3Us and cross-checks the statistics.
 
-At the first mapping test the IPTV-org EPG definitions covered roughly half of the nearly 3,000 English playlist channel IDs. That is a source-data limitation, not a Kodi limitation. We can later use XMLTV grabbers or other legitimate listing sources to improve the unmatched half where real schedule data exists.
+The mapping layer currently finds EPG definitions for 1,448 of 2,987 English-playlist `tvg-id` values: 1,196 exact matches plus 252 same-channel feed aliases. The remaining 1,539 IDs have no compatible IPTV-org EPG definition at present. That is a source-data limitation, not a Kodi limitation, and missing schedules are not fabricated.
 
 ## Kodi setup
 
-After the generated files exist:
+For the full worldwide English setup:
 
 1. Open **Add-ons > My add-ons > PVR clients > IPTV Simple Client > Configure**.
 2. Edit the main enabled configuration.
@@ -61,6 +69,8 @@ After the generated files exist:
 4. Under **EPG**, set the XMLTV URL to the generated `guide.xml.gz` URL above.
 5. Save, fully quit Kodi and reopen it.
 6. Open **TV > Guide** and let PVR Manager finish importing data.
+
+If the full playlist is too cumbersome on Xbox, switch the M3U URL to generated `uk.m3u`. It embeds and uses the same programme-guide URL, so no second EPG is required.
 
 A shorter Xbox-focused walkthrough is in [`KODI_SETUP.md`](KODI_SETUP.md).
 
@@ -73,7 +83,7 @@ The local validator keeps state across runs and classifies streams as:
 - working,
 - access/geo restricted,
 - temporarily failed,
-- repeatedly failed / likely dead,
+- hard not-found/gone,
 - untestable Kodi web-scraper entries.
 
-Only streams that meet the conservative removal threshold are omitted from its validated output. See [`STREAM_VALIDATION.md`](STREAM_VALIDATION.md).
+All actual removals still require repeated consecutive failed validation runs, including 404/410 responses. A successful, access-restricted or deliberately untested result resets the failure streak. See [`STREAM_VALIDATION.md`](STREAM_VALIDATION.md).
