@@ -30,7 +30,8 @@ Defaults are intentionally conservative:
 - up to 24 parallel probes,
 - 8 second ffprobe timeout,
 - 2 attempts per stream,
-- **all** failed streams need 3 separate validation runs before removal, including repeated HTTP 404/410 results,
+- **all** failed streams need 3 consecutive validation runs before removal, including repeated HTTP 404/410 results,
+- a working, access-restricted or deliberately untested result resets that failure streak,
 - HTTP 401/403/451 and similar access/geo restrictions are kept,
 - Kodi web-scraper entries are kept because ffprobe cannot test them directly.
 
