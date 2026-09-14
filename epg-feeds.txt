@@ -23,3 +23,11 @@ https://epgshare01.online/epgshare01/epg_ripper_PLEX1.xml.gz
 https://epgshare01.online/epgshare01/epg_ripper_PEACOCK1.xml.gz
 https://epgshare01.online/epgshare01/epg_ripper_ALJAZEERA1.xml.gz
 https://epgshare01.online/epgshare01/epg_ripper_VOA1.xml.gz
+
+# Matching guides for the FAST playlists appended by append_fast_sources.py.
+# These use the same service-native IDs as the source M3Us, so they can join
+# without fuzzy matching.
+https://i.mjh.nz/SamsungTVPlus/gb.xml.gz
+https://i.mjh.nz/PlutoTV/gb.xml.gz
+https://i.mjh.nz/Plex/gb.xml.gz
+https://i.mjh.nz/Roku/all.xml.gz
