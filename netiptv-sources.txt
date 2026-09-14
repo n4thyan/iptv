@@ -1,27 +1,51 @@
 IPTV SOURCE REFERENCE
 
-GENERATED KODI OUTPUTS
+RECOMMENDED KODI OUTPUTS
 
-Full English playlist
-https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u
+Curated English + FAST playlist
+https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u
 
-Optional UK-only playlist
-https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u
+Curated UK-only playlist
+https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u
 
 Shared XMLTV guide
 https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz
 
-UPSTREAM PLAYLIST SOURCES
+BROADER GENERATED OUTPUTS
 
-Primary — English-language worldwide
+Full English + FAST playlist
+https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u
+
+Full UK-only playlist
+https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u
+
+BASE IPTV-ORG SOURCES
+
+English-language worldwide
 https://iptv-org.github.io/iptv/languages/eng.m3u
 
-UK-only source (also used to tag the UK group in the full English build)
+UK-only source
 https://iptv-org.github.io/iptv/countries/uk.m3u
 
-Western Europe reference only
-https://iptv-org.github.io/iptv/regions/wer.m3u
+FAST SOURCES APPENDED TO THE ENGLISH BUILD
 
-The old adult/call-in extras source has been removed because the streams were not working reliably. Adult/NSFW channels are also filtered automatically from generated playlists using IPTV-org metadata plus the conservative fallback filter.
+Samsung TV Plus GB
+https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/samsungtvplus_gb.m3u
 
-The normal Kodi configuration should use the generated URLs above rather than raw upstream or unrelated third-party playlists. This keeps the source chain understandable and lets the repository apply grouping, filtering and EPG matching consistently.
+Pluto TV GB
+https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plutotv_gb.m3u
+
+Plex TV GB
+https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plex_gb.m3u
+
+Roku Channel
+https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/roku_all.m3u
+
+MATCHING FAST EPG SOURCES
+
+https://i.mjh.nz/SamsungTVPlus/gb.xml.gz
+https://i.mjh.nz/PlutoTV/gb.xml.gz
+https://i.mjh.nz/Plex/gb.xml.gz
+https://i.mjh.nz/Roku/all.xml.gz
+
+The normal Kodi configuration should use the generated curated URL rather than any individual upstream source. The pipeline handles grouping, duplicate stream URLs, adult filtering on appended FAST entries and guide curation.
