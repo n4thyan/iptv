@@ -1,91 +1,101 @@
-# IPTV / Kodi project
+# IPTV / Kodi on Xbox
 
-Kodi-on-Xbox IPTV playlist and EPG tooling, designed to stay lightweight and usable without leaving a PC running.
+A lightweight Kodi-on-Xbox IPTV setup with an automatically generated M3U playlist and XMLTV guide. Normal playback and guide updates come directly from GitHub, so the PC does **not** need to remain switched on.
 
 ## Recommended Kodi setup
 
-Use the generated **curated** playlist for normal TV viewing:
+Use one **PVR IPTV Simple Client** instance:
 
-- Curated English playlist: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u`
-- Curated UK-only playlist: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u`
-- EPG: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
+- M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u`
+- XMLTV: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
 
-The curated playlists contain only channels whose final playlist `tvg-id` has real programme rows in the generated XMLTV guide. This avoids filling Kodi's guide with thousands of blank rows.
+For a UK-only setup use `curated-uk.m3u` instead and keep the same guide URL.
 
-The broader source playlists are still published when you want to browse everything:
+The curated playlist only keeps channels that currently have real programme rows in the generated XMLTV, so Kodi is not filled with thousands of blank guide entries.
 
-- Full English playlist: `https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u`
-- Full UK playlist: `https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u`
+## What is in the main playlist
 
-All generated M3Us embed the same EPG URL in their `x-tvg-url` header.
+The build starts with IPTV-org's English-language playlist, filters adult/NSFW entries conservatively, adds useful grouping, and then appends maintained free ad-supported streaming television (FAST) services before the EPG pass.
 
-## Why the EPG pipeline changed
+Current FAST sources:
 
-The first EPG implementation mapped the IPTV-org English playlist into `iptv-org/epg` and then scraped many guide providers channel-by-channel. It was accurate but far too slow for this project: a single primary pass could take well over an hour before fallback providers were attempted.
+- **Samsung TV Plus — GB**
+- **Pluto TV — GB**
+- **Plex TV — GB**
+- **Roku Channel — all-region source**
 
-The production pipeline now consumes a curated set of **prebuilt XMLTV feeds**, matches them to IPTV-org channels using exact IDs plus deliberately conservative known compatibility rules, de-duplicates programme rows, rewrites matched data to the playlist's exact `tvg-id` values, and publishes only channels with real programme data. The slow provider scraper scripts remain in the repository as research/enrichment tools, but they no longer block the daily Kodi build.
+FAST entries receive an extra Kodi group such as `FAST - Samsung TV Plus` or `FAST - Pluto TV`, while retaining their original genre group as well. Duplicate stream URLs are skipped.
 
-`epg-feeds.txt` contains the maintained feed list. It prioritizes the UK and other English-speaking countries, plus selected international coverage useful for this setup.
+The FAST source playlists come from the maintained `BuddyChewChew/app-m3u-generator` project. Their matching XMLTV guides come from `i.mjh.nz`, allowing service-native `tvg-id` values to join directly without fuzzy guessing.
+
+## EPG pipeline
+
+The production guide uses the **fast prebuilt-feed path only**. The previous provider-by-provider scraper, batching, fallback-selector and XMLTV-fragment pipeline has been removed from `main`.
+
+The current process is:
+
+1. build the cleaned English playlist;
+2. append Samsung TV Plus, Pluto TV, Plex TV and Roku FAST entries;
+3. build the optional UK-only playlist;
+4. download the maintained XMLTV feeds in `epg-feeds.txt` concurrently;
+5. match exact IDs first and only apply explicitly defined conservative compatibility rules;
+6. rewrite compatible XMLTV IDs to the exact playlist `tvg-id` where required;
+7. de-duplicate programme rows;
+8. create `curated.m3u` and `curated-uk.m3u` containing only channels with programme data;
+9. validate the output before replacing the `generated` branch.
+
+Wrong guide data is considered worse than a missing guide row, so ambiguous matches are rejected rather than guessed.
+
+## Published outputs
+
+The `generated` branch is an **output branch**, not a development branch. It is force-refreshed automatically after a successful build.
+
+Published files include:
+
+- `curated.m3u` — recommended English + FAST playlist with EPG coverage;
+- `curated-uk.m3u` — UK-only curated playlist;
+- `english.m3u` — broader English + FAST playlist;
+- `uk.m3u` — broader UK-only playlist;
+- `guide.xml.gz` — shared XMLTV guide;
+- `guide-stats.json`;
+- `epg-coverage.txt`;
+- `epg-failures.txt`;
+- playlist statistics;
+- `last-update.txt`.
+
+## Repository branches
+
+`main` is the canonical source branch. All previous feature PRs have already been merged into it. Old feature branch names may still exist as historical refs, but they are not separate unfinished versions of the project.
+
+`generated` intentionally remains separate because Kodi reads the automatically published M3U/XMLTV files from it.
 
 ## Automatic build
 
-`.github/workflows/update-generated.yml` runs daily and on relevant changes. It has a 30-minute hard ceiling and:
+`.github/workflows/update-generated.yml` runs daily, on relevant changes, and manually through GitHub Actions. It has a 30-minute ceiling and only publishes after regression tests and generated-output checks pass.
 
-1. downloads IPTV-org's current English and UK playlists;
-2. removes adult/NSFW entries conservatively;
-3. preserves stream URLs, logos, IDs, channel groups and Kodi/VLC directives;
-4. appends a real `UK` group to matching entries in the full English list;
-5. downloads the prebuilt XMLTV feeds listed in `epg-feeds.txt` in parallel;
-6. keeps only programme data that can be mapped safely to current playlist `tvg-id` values;
-7. rewrites XMLTV IDs to those exact playlist IDs and de-duplicates programme rows;
-8. creates `curated.m3u` and `curated-uk.m3u` from channels that actually have programme data;
-9. validates the playlists and guide before publishing;
-10. force-refreshes the `generated` branch only after the build passes validation.
-
-A failed build therefore does not intentionally replace the previous good generated output.
-
-## Generated diagnostics
-
-The `generated` branch also publishes:
-
-- `guide-stats.json` — programme/channel counts and per-feed results;
-- `epg-coverage.txt` — matched and unmatched playlist IDs;
-- `epg-failures.txt` — feed download/parse failures, if any;
-- `playlist-stats.json` and `uk-playlist-stats.json`;
-- `curated-playlist-stats.json` and `curated-uk-playlist-stats.json`;
-- `last-update.txt`.
-
-Coverage is intentionally conservative. Wrong guide data is worse than a blank guide row, so ambiguous mappings are rejected instead of guessed.
-
-## Main upstream playlist sources
-
-| Purpose | URL |
-|---|---|
-| English worldwide | `https://iptv-org.github.io/iptv/languages/eng.m3u` |
-| UK-only | `https://iptv-org.github.io/iptv/countries/uk.m3u` |
-| Western Europe reference | `https://iptv-org.github.io/iptv/regions/wer.m3u` |
-
-## Kodi on Xbox
-
-Kodi uses **PVR IPTV Simple Client**.
-
-For the normal setup:
-
-- M3U playlist URL → generated `curated.m3u`
-- XMLTV URL → generated `guide.xml.gz`
-
-If you only want UK channels, change the M3U URL to `curated-uk.m3u` and keep the same XMLTV URL.
-
-The PC is only a setup/maintenance workstation. It is not required for normal playback or EPG updates.
-
-Useful helpers remain in `tools/` for sending long URLs to Kodi over JSON-RPC and for temporary SMB transfer/backup tasks. Those helpers now default to the curated playlist while retaining full-list options.
+A failed build therefore does not intentionally replace the previous known-good generated output.
 
 ## Stream validation
 
-Do not delete a stream because one HTTP probe fails. IPTV streams can be temporarily unavailable, geo-blocked, rate-limited or require headers.
+Stream health is deliberately separate from playlist generation. A single HTTP failure is not enough to delete a channel because IPTV/FAST streams can be geo-blocked, rate-limited, temporarily unavailable or require particular request behaviour.
 
-`tools/validate_streams.py` is a conservative local health checker intended to run from the same network as the Xbox. Stream cleanup stays separate from playlist generation so transient outages do not silently destroy the maintained list.
+`tools/validate_streams.py` is the local conservative checker and should be run from the same network as the Xbox when a cleanup is actually needed.
 
-## Next project phase
+## Kodi UI / Sky-Q-style phase
 
-The backend is stable enough to stop chasing marginal EPG coverage. The next layer is presentation and service integration: tune the installed Sky/Sky-Q-style guide/navigation, organise channel numbering/groups/favourites, and integrate working catch-up services such as BBC iPlayer into the main Kodi TV / Videos / Movies experience where the skin permits custom menu items and widgets.
+The data layer is no longer the main project blocker. The next phase is making Kodi behave like a dedicated TV appliance rather than a generic media centre.
+
+Priorities:
+
+1. tune the installed Sky/Sky-Q-style skin so **TV / Guide / channels** dominate the home screen;
+2. expose useful channel groups and favourites cleanly;
+3. surface **BBC iPlayer content directly on the Kodi home screen** using the skin's custom menu/widget system instead of repeatedly opening Video add-ons;
+4. create direct iPlayer entry points for useful sections such as featured/popular programmes, categories and films where the installed iPlayer WWW add-on exposes them;
+5. add reliable ITVX / Channel 4 / My5 integrations only after iPlayer is behaving properly;
+6. finish controller/remote navigation and visual polish last.
+
+BBC iPlayer playback is already working on the Xbox. The remaining work is **navigation and widget integration**, not basic iPlayer setup.
+
+## Project status
+
+See [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) for the current handoff and [`docs/KODI_SETUP.md`](docs/KODI_SETUP.md) for Kodi/PVR configuration details.
