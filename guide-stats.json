@@ -1,0 +1,242 @@
+{
+  "requested_playlist_ids": 3978,
+  "sources_configured": 23,
+  "sources_downloaded": 23,
+  "sources_failed": 0,
+  "channel_elements": 1300,
+  "programme_elements": 81342,
+  "channels_with_programmes": 1300,
+  "playlist_ids_without_programmes": 2678,
+  "source_details": [
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_US_SPORTS1.xml.gz",
+      "downloaded": true,
+      "bytes": 308665,
+      "matched_channel_elements": 0,
+      "matched_programmes": 0,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 267
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_UK1.xml.gz",
+      "downloaded": true,
+      "bytes": 2807105,
+      "matched_channel_elements": 78,
+      "matched_programmes": 8031,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 66,
+      "unmatched_source_ids": 420
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_IE1.xml.gz",
+      "downloaded": true,
+      "bytes": 2517987,
+      "matched_channel_elements": 9,
+      "matched_programmes": 1214,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 15,
+      "unmatched_source_ids": 160
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_US2.xml.gz",
+      "downloaded": true,
+      "bytes": 6573637,
+      "matched_channel_elements": 158,
+      "matched_programmes": 17663,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 134,
+      "unmatched_source_ids": 632
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_CA2.xml.gz",
+      "downloaded": true,
+      "bytes": 6434233,
+      "matched_channel_elements": 23,
+      "matched_programmes": 2053,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 26,
+      "unmatched_source_ids": 670
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_ZA1.xml.gz",
+      "downloaded": true,
+      "bytes": 193014,
+      "matched_channel_elements": 7,
+      "matched_programmes": 719,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 7,
+      "unmatched_source_ids": 138
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_AU1.xml.gz",
+      "downloaded": true,
+      "bytes": 4147530,
+      "matched_channel_elements": 13,
+      "matched_programmes": 2527,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 13,
+      "unmatched_source_ids": 341
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_NZ1.xml.gz",
+      "downloaded": true,
+      "bytes": 417584,
+      "matched_channel_elements": 9,
+      "matched_programmes": 984,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 8,
+      "unmatched_source_ids": 92
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_IN4.xml.gz",
+      "downloaded": true,
+      "bytes": 976398,
+      "matched_channel_elements": 40,
+      "matched_programmes": 1509,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 43,
+      "unmatched_source_ids": 514
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_SG1.xml.gz",
+      "downloaded": true,
+      "bytes": 581542,
+      "matched_channel_elements": 5,
+      "matched_programmes": 732,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 5,
+      "unmatched_source_ids": 160
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_DISTROTV1.xml.gz",
+      "downloaded": true,
+      "bytes": 19499,
+      "matched_channel_elements": 0,
+      "matched_programmes": 0,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 90
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_DE1.xml.gz",
+      "downloaded": true,
+      "bytes": 3698233,
+      "matched_channel_elements": 4,
+      "matched_programmes": 566,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 4,
+      "unmatched_source_ids": 262
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_NL1.xml.gz",
+      "downloaded": true,
+      "bytes": 1911994,
+      "matched_channel_elements": 1,
+      "matched_programmes": 65,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 1,
+      "unmatched_source_ids": 158
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_PEACOCK1.xml.gz",
+      "downloaded": true,
+      "bytes": 137797,
+      "matched_channel_elements": 0,
+      "matched_programmes": 0,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 31
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_ALJAZEERA1.xml.gz",
+      "downloaded": true,
+      "bytes": 4291,
+      "matched_channel_elements": 0,
+      "matched_programmes": 0,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 2
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_VOA1.xml.gz",
+      "downloaded": true,
+      "bytes": 403,
+      "matched_channel_elements": 0,
+      "matched_programmes": 0,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 10
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_US_LOCALS1.xml.gz",
+      "downloaded": true,
+      "bytes": 57420101,
+      "matched_channel_elements": 0,
+      "matched_programmes": 0,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 4456
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_FR1.xml.gz",
+      "downloaded": true,
+      "bytes": 5348866,
+      "matched_channel_elements": 11,
+      "matched_programmes": 2439,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 8,
+      "unmatched_source_ids": 566
+    },
+    {
+      "source": "https://epgshare01.online/epgshare01/epg_ripper_PLEX1.xml.gz",
+      "downloaded": true,
+      "bytes": 4816595,
+      "matched_channel_elements": 0,
+      "matched_programmes": 0,
+      "exact_source_ids": 0,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 690
+    },
+    {
+      "source": "https://i.mjh.nz/SamsungTVPlus/gb.xml.gz",
+      "downloaded": true,
+      "bytes": 266037,
+      "matched_channel_elements": 267,
+      "matched_programmes": 2559,
+      "exact_source_ids": 267,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 0
+    },
+    {
+      "source": "https://i.mjh.nz/Plex/gb.xml.gz",
+      "downloaded": true,
+      "bytes": 881247,
+      "matched_channel_elements": 364,
+      "matched_programmes": 15706,
+      "exact_source_ids": 364,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 1
+    },
+    {
+      "source": "https://i.mjh.nz/PlutoTV/gb.xml.gz",
+      "downloaded": true,
+      "bytes": 514341,
+      "matched_channel_elements": 118,
+      "matched_programmes": 2844,
+      "exact_source_ids": 118,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 69
+    },
+    {
+      "source": "https://i.mjh.nz/Roku/all.xml.gz",
+      "downloaded": true,
+      "bytes": 3259321,
+      "matched_channel_elements": 245,
+      "matched_programmes": 21731,
+      "exact_source_ids": 245,
+      "compatible_source_ids": 0,
+      "unmatched_source_ids": 459
+    }
+  ]
+}

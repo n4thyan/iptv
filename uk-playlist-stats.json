@@ -1,0 +1,14 @@
+{
+  "source": "https://iptv-org.github.io/iptv/countries/uk.m3u",
+  "epg_url_embedded": "https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz",
+  "entries_total": 311,
+  "entries_kept": 311,
+  "adult_entries_removed": 0,
+  "adult_removed_by_iptv_org_database": 0,
+  "adult_removed_by_fallback_filter": 0,
+  "malformed_entries_skipped": 0,
+  "option_directive_lines_preserved": 0,
+  "unique_tvg_ids": 311,
+  "iptv_org_nsfw_ids_loaded": 375,
+  "extra_groups": {}
+}

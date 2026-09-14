@@ -1,0 +1,11 @@
+{
+  "generated_at_utc": "2026-09-14T10:10:17.612470+00:00",
+  "past_hours": 3,
+  "future_hours": 36,
+  "input_channels": 1300,
+  "input_programmes": 81342,
+  "output_channels": 1300,
+  "channels_with_programmes_in_window": 1300,
+  "output_programmes": 43761,
+  "programme_reduction_percent": 46.2
+}

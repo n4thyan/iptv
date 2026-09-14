@@ -1,0 +1,20 @@
+{
+  "source": "https://iptv-org.github.io/iptv/languages/eng.m3u",
+  "epg_url_embedded": "https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz",
+  "entries_total": 2985,
+  "entries_kept": 2984,
+  "adult_entries_removed": 1,
+  "adult_removed_by_iptv_org_database": 0,
+  "adult_removed_by_fallback_filter": 1,
+  "malformed_entries_skipped": 0,
+  "option_directive_lines_preserved": 108,
+  "unique_tvg_ids": 2984,
+  "iptv_org_nsfw_ids_loaded": 375,
+  "extra_groups": {
+    "UK": {
+      "source": "https://iptv-org.github.io/iptv/countries/uk.m3u",
+      "source_tvg_ids": 311,
+      "entries_tagged": 276
+    }
+  }
+}
