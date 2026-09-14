@@ -15,6 +15,14 @@ if (-not $KodiIp) {
     throw "Kodi IP address is required."
 }
 
+if (-not $Username) {
+    $enteredUsername = Read-Host "Kodi HTTP username [kodi]"
+    $Username = if ($enteredUsername) { $enteredUsername } else { "kodi" }
+}
+if (-not $Password) {
+    $Password = Read-Host "Kodi HTTP password"
+}
+
 Write-Host ""
 Write-Host "Choose what to type into the CURRENT Kodi text box:"
 Write-Host "  1  Curated English M3U (recommended)"
