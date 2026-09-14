@@ -27,7 +27,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Verify playlist and XMLTV guide
+      - name: Verify playlist and XMLTV guides
         run: |
           python - <<'PY'
           import gzip
@@ -42,7 +42,9 @@ jobs:
               Path('curated.m3u'),
               Path('curated-uk.m3u'),
               Path('guide.xml.gz'),
+              Path('guide-full.xml.gz'),
               Path('guide-stats.json'),
+              Path('xbox-guide-stats.json'),
               Path('playlist-stats.json'),
               Path('uk-playlist-stats.json'),
               Path('curated-playlist-stats.json'),
@@ -68,6 +70,22 @@ jobs:
                       ids.add(match.group(1))
               return ids
 
+          def load_guide(path: str):
+              with gzip.open(path, 'rb') as handle:
+                  root = ET.parse(handle).getroot()
+              channels = {
+                  item.attrib.get('id', '')
+                  for item in root.findall('channel')
+                  if item.attrib.get('id')
+              }
+              programmes = root.findall('programme')
+              programme_ids = {
+                  item.attrib.get('channel', '')
+                  for item in programmes
+                  if item.attrib.get('channel')
+              }
+              return channels, programmes, programme_ids
+
           english_ids = playlist_ids(Path('english.m3u'))
           uk_ids = playlist_ids(Path('uk.m3u'))
           curated_ids = playlist_ids(Path('curated.m3u'))
@@ -82,26 +100,33 @@ jobs:
           if len(curated_uk_ids) < 5:
               raise SystemExit(f'curated UK playlist unexpectedly small: {len(curated_uk_ids)}')
 
-          with gzip.open('guide.xml.gz', 'rb') as handle:
-              root = ET.parse(handle).getroot()
-          programmes = root.findall('programme')
-          programme_ids = {
-              item.attrib.get('channel', '')
-              for item in programmes
-              if item.attrib.get('channel')
-          }
-          if len(programme_ids) < 50 or not programmes:
-              raise SystemExit('guide contains too little programme data')
-          if not curated_ids.issubset(programme_ids):
-              raise SystemExit('curated.m3u contains channels without programme data')
-          if not curated_uk_ids.issubset(programme_ids):
-              raise SystemExit('curated-uk.m3u contains channels without programme data')
+          full_channels, full_programmes, full_programme_ids = load_guide('guide-full.xml.gz')
+          xbox_channels, xbox_programmes, xbox_programme_ids = load_guide('guide.xml.gz')
+
+          if len(full_programme_ids) < 50 or not full_programmes:
+              raise SystemExit('full guide contains too little programme data')
+          if not curated_ids.issubset(full_programme_ids):
+              raise SystemExit('curated.m3u contains channels without full-guide programme data')
+          if not curated_uk_ids.issubset(full_programme_ids):
+              raise SystemExit('curated-uk.m3u contains channels without full-guide programme data')
+
+          if len(xbox_programmes) < 1000:
+              raise SystemExit('Xbox guide contains too little programme data')
+          if len(xbox_programmes) >= len(full_programmes):
+              raise SystemExit('Xbox guide was not reduced versus the full guide')
+          if not curated_ids.issubset(xbox_channels):
+              raise SystemExit('Xbox guide is missing curated channel definitions')
 
           guide_stats = json.loads(Path('guide-stats.json').read_text())
-          if int(guide_stats.get('channels_with_programmes', -1)) != len(programme_ids):
-              raise SystemExit('guide-stats.json channel count does not match guide')
-          if int(guide_stats.get('programme_elements', -1)) != len(programmes):
-              raise SystemExit('guide-stats.json programme count does not match guide')
+          xbox_stats = json.loads(Path('xbox-guide-stats.json').read_text())
+          if int(guide_stats.get('channels_with_programmes', -1)) != len(full_programme_ids):
+              raise SystemExit('guide-stats.json channel count does not match full guide')
+          if int(guide_stats.get('programme_elements', -1)) != len(full_programmes):
+              raise SystemExit('guide-stats.json programme count does not match full guide')
+          if int(xbox_stats.get('output_programmes', -1)) != len(xbox_programmes):
+              raise SystemExit('xbox-guide-stats.json programme count does not match Xbox guide')
+          if int(xbox_stats.get('input_programmes', -1)) != len(full_programmes):
+              raise SystemExit('Xbox guide input count does not match full guide')
 
           coverage = Path('epg-coverage.txt').read_text(encoding='utf-8', errors='replace')
           for label in ('channels with programmes:', 'playlist ids without programme data:', 'UNMATCHED IDS'):
@@ -112,7 +137,8 @@ jobs:
           print(f'uk_channels={len(uk_ids)}')
           print(f'curated_channels={len(curated_ids)}')
           print(f'curated_uk_channels={len(curated_uk_ids)}')
-          print(f'guide_channels_with_programmes={len(programme_ids)}')
-          print(f'programmes={len(programmes)}')
+          print(f'full_guide_programmes={len(full_programmes)}')
+          print(f'xbox_guide_programmes={len(xbox_programmes)}')
+          print(f'xbox_guide_channels_with_programmes={len(xbox_programme_ids)}')
           print(Path('last-update.txt').read_text().strip())
           PY
