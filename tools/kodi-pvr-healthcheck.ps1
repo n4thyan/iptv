@@ -12,7 +12,7 @@ $statePath = Join-Path $PSScriptRoot ".kodi-helper.local.json"
 
 if (-not $Username) {
     $enteredUsername = Read-Host "Kodi HTTP username [kodi]"
-    $Username = if ($enteredUsername) { $enteredUsername } else { "kodi" }
+    $Username = if ($enteredUsername) { $enteredUsername.Trim() } else { "kodi" }
 }
 if (-not $Password) {
     $Password = Read-Host "Kodi HTTP password"
@@ -21,13 +21,16 @@ if (-not $Password) {
 if (-not $KodiIp -and (Test-Path $statePath)) {
     try {
         $saved = Get-Content -Raw $statePath | ConvertFrom-Json
-        if ($saved.ip) { $KodiIp = [string]$saved.ip }
+        if ($saved.ip) { $KodiIp = ([string]$saved.ip).Trim() }
         if ($saved.port) { $Port = [int]$saved.port }
     }
     catch {}
 }
 if (-not $KodiIp) {
-    $KodiIp = Read-Host "Xbox/Kodi IP address"
+    $KodiIp = (Read-Host "Xbox/Kodi IP address").Trim()
+}
+else {
+    $KodiIp = $KodiIp.Trim()
 }
 if (-not $KodiIp) {
     throw "Kodi IP address is required."
@@ -89,6 +92,18 @@ catch {
     Write-Host "IPTV Simple details query failed: $($_.Exception.Message)"
 }
 
+try {
+    $demo = Invoke-KodiJsonRpc -Method "Addons.GetAddonDetails" -Params @{
+        addonid = "pvr.demo"
+        properties = @("name", "version", "enabled")
+    }
+    $demoDetails = $demo.addon
+    Write-Host ("Demo PVR: {0} v{1}, enabled={2}" -f $demoDetails.name, $demoDetails.version, $demoDetails.enabled)
+}
+catch {
+    Write-Host "Demo PVR details query failed: $($_.Exception.Message)"
+}
+
 function Show-PvrState {
     try {
         $pvr = Invoke-KodiJsonRpc -Method "PVR.GetProperties" -Params @{ properties = @("available", "recording", "scanning") }
@@ -115,11 +130,11 @@ if ($RestartPvrClient) {
 
 Write-Host ""
 if ($available) {
-    Write-Host "PVR reports available. If the guide is stale, clear Kodi's PVR/EPG caches once after changing the M3U/XMLTV URLs."
+    Write-Host "PVR reports available. If the guide is stale, clear Kodi's PVR/EPG data once after changing the M3U/XMLTV URLs."
 }
 else {
-    Write-Host "PVR is not available yet. Because the M3U/XMLTV files validate externally, the next recovery step is Kodi's local PVR cache reset."
-    Write-Host "Kodi: Settings > PVR & Live TV > General > Clear cache"
-    Write-Host "Then: Settings > PVR & Live TV > Guide > Clear cache"
-    Write-Host "Finally fully quit Kodi from the Xbox dashboard and reopen it."
+    Write-Host "PVR is not available. Kodi 21 / IPTV Simple has a documented upstream 'PVR Manager 0%' failure, including Xbox Series X."
+    Write-Host "If you already cleared Channels/Groups/Guide/Providers and fully restarted Kodi, do not repeat the cache reset."
+    Write-Host "Run: tools\kodi-pvr-demo-workaround.cmd"
+    Write-Host "That enables Demo PVR first and then re-enables IPTV Simple, matching the upstream workaround without deleting your URLs."
 }
