@@ -1,141 +1,87 @@
 # Project status / handoff
 
-This is the current checkpoint for the Kodi-on-Xbox IPTV project.
+Current checkpoint for the Kodi-on-Xbox IPTV project.
 
-## Data layer: stable
+## Repository state
 
-The production path is now the fast prebuilt-feed pipeline. The old provider-by-provider scraper remains in the repository only as optional research/enrichment tooling and is not part of the normal daily build.
+`main` is the canonical development branch. All historical feature PRs are already merged. The `generated` branch remains separate intentionally because it is the automatically published output Kodi consumes.
 
-Recommended Kodi endpoints:
+The retired provider-by-provider EPG scraper chain has now been removed from `main`, including its catalog, channel-mapping, fallback, batching, split/merge helpers and their dedicated tests.
 
-- Curated English playlist: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u`
-- Curated UK-only playlist: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u`
-- Shared XMLTV guide: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
+The production path is the fast prebuilt-feed pipeline only.
 
-Broader playlists remain available when needed:
+## Kodi endpoints
 
-- Full English: `https://raw.githubusercontent.com/n4thyan/iptv/generated/english.m3u`
-- Full UK: `https://raw.githubusercontent.com/n4thyan/iptv/generated/uk.m3u`
-
-The curated playlists are the normal choice because they contain only playlist entries that currently have real programme rows in the generated XMLTV.
-
-## Current verified build
-
-The build after Canada support was added completed successfully and the independent generated-output verifier also passed.
-
-At that checkpoint:
-
-- source English playlist IDs: 2,987
-- channels with programme data: 352
-- programme rows: 37,738
-- EPG feeds configured/downloaded: 19 / 19
-- EPG feed failures: 0
-- curated English entries: 352
-- curated UK entries: 64
-
-Useful country contributions included:
-
-- US: 157 matched channel elements / 16,870 programmes
-- Canada: 23 / 2,052
-- India: 45 / 1,699
-- Australia: 13 / 2,537
-- New Zealand: 9 / 914
-
-These numbers are not hard-coded promises; `guide-stats.json` and the curated playlist stats on the `generated` branch are authoritative after every refresh.
-
-## Production EPG behavior
-
-The builder downloads the maintained sources in `epg-feeds.txt` concurrently. It first accepts exact playlist IDs and then applies only explicit conservative compatibility rules such as punctuation/quality differences, known EPGShare dataset suffixes and known UK regional aliases. Country boundaries and ambiguous collisions are preserved rather than guessed across.
-
-The final XMLTV channel/programme IDs are rewritten to the exact `tvg-id` values used by the playlist so Kodi can join the guide automatically.
-
-The production build does not chase every unmatched channel. A blank/unavailable channel is preferred over attaching the wrong schedule.
-
-## Generated diagnostics
-
-Current generated diagnostics are:
-
-- `guide-stats.json`
-- `epg-coverage.txt`
-- `epg-failures.txt`
-- `playlist-stats.json`
-- `uk-playlist-stats.json`
-- `curated-playlist-stats.json`
-- `curated-uk-playlist-stats.json`
-- `last-update.txt`
-
-The old `epg-chunk-summary.txt` output belonged to the retired slow scraping pipeline and is no longer produced.
-
-## Kodi / Xbox setup
-
-Keep one PVR IPTV Simple Client configuration for normal use:
+Normal setup:
 
 - M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u`
 - XMLTV: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
 
-If a UK-only installation is wanted, switch the M3U to `curated-uk.m3u` and keep the same EPG.
+UK-only alternative:
 
-The PC remains a setup/maintenance workstation only. Kodi reads the GitHub endpoints directly, so the PC does not need to stay on.
+- M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u`
+- XMLTV: same shared guide
 
-The helper scripts in `tools/` now default to the curated playlist and still expose the full playlists as optional choices.
+The PC remains a setup/maintenance workstation only.
 
-## Stream health
+## FAST services
 
-Stream validation stays separate from playlist generation. `tools/validate_streams.py` should be run from the same network as the Xbox when a cleanup is wanted. Do not delete a channel because one cloud or HTTP probe fails; geo-blocks, headers and temporary upstream faults can make working streams look dead.
+The normal English build now appends maintained free FAST sources before guide curation:
 
-## Kodi-side phase now
+- Samsung TV Plus GB
+- Pluto TV GB
+- Plex TV GB
+- Roku Channel
 
-The backend is no longer the blocker. The next work is Kodi presentation and service integration:
+Each source receives an extra Kodi group such as `FAST - Samsung TV Plus` while retaining its original genre group. Duplicate stream URLs are skipped.
 
-1. tune the installed Sky/Sky-Q-style skin and guide layout;
-2. set useful channel numbering, groups and favourites;
-3. integrate BBC iPlayer/catch-up entry points into the TV / Videos / Movies navigation where the installed skin permits custom menu items/widgets;
-4. add other legitimate broadcaster catch-up services only where they work reliably on Xbox Kodi;
-5. polish remote/controller navigation so it behaves like a TV appliance rather than a generic media centre.
+Matching service-native XMLTV feeds from `i.mjh.nz` are included in `epg-feeds.txt`, so these channels can survive into `curated.m3u` when real programme rows are present.
 
-BBC iPlayer is already working as an add-on on the Xbox, so the next step is menu/library-style integration rather than basic playback setup.
+## Historical verified checkpoint
 
-## End-of-day handoff — 2026-09-11
+Before FAST integration, the 2026-09-11 verified build contained 352 channels with programme data and 37,738 programme rows. That figure is now historical; use the current `guide-stats.json` and playlist-stat files on the `generated` branch for authoritative live figures.
 
-Stop here for tonight. The GitHub/EPG backend is considered complete enough and should not be reopened tomorrow unless Kodi exposes an actual regression.
+## Kodi / Xbox UI phase
 
-Known-good state at handoff:
+The backend is no longer the main blocker. The current goal is a coherent Sky-Q-style appliance experience.
 
-- production EPG pipeline is the fast prebuilt-feed path;
-- current curated English guide contains 352 channels with real programme rows;
-- UK, US, Canada, Australia, New Zealand and India all contribute usable listings;
-- Canada `CA2` namespace support is merged;
-- generated-output verification passed after the Canada build;
-- final documentation/helper cleanup PR was merged;
-- post-merge tests on `main` passed;
-- Windows helpers now default to `curated.m3u` rather than the full English list;
-- stale references to the retired slow EPG chunk-summary workflow were removed;
-- BBC iPlayer is installed and working on Kodi/Xbox;
-- the Sky/Sky-Q-style skin/theme is installed and ready to configure.
+Order of work:
 
-Tomorrow's first-session order:
+1. confirm Kodi is using `curated.m3u` + `guide.xml.gz` after the latest generated build;
+2. tune the installed Sky/Sky-Q-style skin so TV/Guide is the dominant home experience;
+3. expose channel groups and favourites cleanly, including the FAST service groups;
+4. surface BBC iPlayer content directly as home-screen widgets/menu targets;
+5. add direct iPlayer entry points for useful sections such as Most Popular, Highlights, Categories, A-Z and Live where useful;
+6. only then look at other legitimate catch-up services that work reliably on Xbox Kodi;
+7. finish controller/remote behaviour and visual polish last.
 
-1. confirm Kodi is actually using `curated.m3u` + `guide.xml.gz` and that TV Guide populates correctly;
-2. inspect the installed skin's home-menu customization, widget and submenu controls;
-3. make the TV section feel like the main live-TV hub rather than a generic Kodi menu;
-4. expose BBC iPlayer directly from TV / Videos / Movies using skin shortcuts/widgets instead of making the user browse Add-ons;
-5. decide which iPlayer nodes are useful as direct widgets, e.g. featured/popular, categories, films or programme listings depending on what the add-on exposes;
-6. organise channel numbers/groups/favourites after the basic UI is visually right;
-7. only after that look at ITVX, Channel 4, My5 or other catch-up integrations that are reliable on Xbox Kodi;
-8. finish controller/remote behaviour and visual polish last.
+BBC iPlayer playback is already working. The remaining iPlayer work is navigation/widget integration rather than authentication or basic playback.
 
-Do not spend the next session trying to increase EPG coverage for zero-match feeds unless a specific wanted channel is missing. The goal from here is a coherent, appliance-like Sky-style Kodi experience.
+## iPlayer widget strategy
 
-## If something looks wrong
+The installed add-on is `plugin.video.iplayerwww`. Its current code exposes top-level modes for Live, A-Z, Categories, Most Popular, Highlights, Watching, Favourites and channel listings.
+
+For the skin setup, prefer navigating to the desired iPlayer folder in Kodi and adding that folder to **Favourites**, then selecting that favourite as a skin widget or submenu target. This avoids hard-coding internal plugin query URLs and still lets the widget refresh from iPlayer dynamically.
+
+Suggested first home rows:
+
+- iPlayer — Most Popular
+- iPlayer — Highlights
+- iPlayer — Categories
+- iPlayer — Live / Channels
+
+The exact widget/menu clicks depend on the installed skin and should be configured on the Xbox from screenshots of its customization screen.
+
+## Diagnostics if TV data looks wrong
 
 Check in this order:
 
 1. `last-update.txt` is current;
-2. `guide-stats.json` reports downloaded sources, matched channels and programme rows;
-3. `curated-playlist-stats.json` reports a non-zero `entries_kept` value;
-4. `epg-coverage.txt` shows matched/unmatched playlist IDs;
-5. `epg-failures.txt` explains any feed download/parse failures;
+2. `guide-stats.json` reports downloaded sources and programme rows;
+3. `curated-playlist-stats.json` reports non-zero kept entries;
+4. `epg-coverage.txt` shows expected matches;
+5. `epg-failures.txt` explains any failed FAST/EPG source;
 6. fully restart Kodi;
 7. only then clear/reload Kodi PVR/EPG data if necessary.
 
-Do not fall back to the retired multi-hour scraping path merely because some channels remain unmatched.
+Do not reintroduce the retired multi-hour scraper merely because some channels remain unmatched.
