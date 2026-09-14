@@ -4,29 +4,25 @@ These steps use the generated curated playlist/EPG, not raw upstream URLs.
 
 ## 1. Recommended sources
 
-For normal use:
+Normal use:
 
 - M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated.m3u`
 - XMLTV: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
 
-For a UK-only installation:
+UK-only installation:
 
 - M3U: `https://raw.githubusercontent.com/n4thyan/iptv/generated/curated-uk.m3u`
 - XMLTV: keep the same guide URL
 
-The broader `english.m3u` and `uk.m3u` outputs still exist, but they intentionally contain many channels with no programme data. Use them only when browsing the full source list is more important than a clean guide.
+The normal curated playlist now includes matching-guide FAST channels from Samsung TV Plus GB, Pluto TV GB, Plex TV GB and Roku. They appear in additional groups such as `FAST - Samsung TV Plus` while retaining their genre groups.
 
 ## 2. Fastest Xbox entry method
-
-You do not need to type long GitHub URLs with the Xbox controller.
 
 Enable:
 
 **Settings → Services → Control → Allow remote control via HTTP**
 
-Then, with the target text field open on Kodi, run `tools\kodi-url-helper.cmd` on the PC. Its first choice is the curated English playlist, followed by the shared EPG and curated UK playlist.
-
-This uses Kodi JSON-RPC only for text entry. The PC is not a permanent host and can be switched off afterwards.
+Then, with the target text field open on Kodi, run `tools\kodi-url-helper.cmd` on the PC. The PC is only being used to enter long text and can be switched off afterwards.
 
 ## 3. IPTV Simple Client
 
@@ -44,25 +40,63 @@ Under **EPG**:
 - Location: **Remote path (Internet address)**
 - XMLTV URL: `https://raw.githubusercontent.com/n4thyan/iptv/generated/guide.xml.gz`
 
-Save the configuration.
+Save, fully quit Kodi from the Xbox dashboard, reopen it, and let PVR Manager finish importing.
 
-## 4. Reload Kodi
+## 4. Guide and FAST groups
 
-Fully quit Kodi from the Xbox dashboard, then reopen it. Let PVR Manager finish importing before judging the guide.
+Open **TV → Guide**.
 
-Open:
+The main curated build now has substantially more programme-backed channels because the FAST sources use matching service-native XMLTV IDs. The guide builder still rejects ambiguous mappings rather than guessing.
 
-**TV → Guide**
+Use Kodi's channel-group selector to access groups such as:
 
-The generated guide rewrites programme/channel IDs to the exact playlist `tvg-id` values, so Kodi can attach listings without manual per-channel mapping.
+- UK
+- FAST - Samsung TV Plus
+- FAST - Pluto TV
+- FAST - Plex TV
+- FAST - Roku Channel
 
-## 5. What the EPG matcher actually does
+Exact visible groups depend on which entries survive the current EPG curation pass.
 
-Production guide generation uses current prebuilt XMLTV feeds. It accepts exact IDs first, then only explicit conservative compatibility cases such as known punctuation/quality differences, known provider dataset suffixes and explicit regional aliases. Ambiguous matches are rejected.
+## 5. BBC iPlayer on the home screen
 
-This is deliberately different from the retired slow provider-by-provider scraper. The current production build is designed to finish quickly and publish only real matched programme rows.
+BBC iPlayer WWW is already installed and working. The goal is to make its content appear directly on the Kodi home screen instead of repeatedly entering **Video add-ons → iPlayer WWW**.
 
-## 6. Diagnostics
+The safest skin-independent method is:
+
+1. open **iPlayer WWW**;
+2. navigate to a useful folder such as **Most Popular**, **Highlights**, **Categories**, **A-Z** or **Live**;
+3. open the context menu on that folder and choose **Add to favourites**;
+4. open the installed skin's **Home menu / Widgets / Customize home menu** settings;
+5. create an iPlayer submenu or widget and point it at the favourite you just created;
+6. repeat for the rows you actually want.
+
+This makes the home widget query iPlayer dynamically while avoiding fragile hard-coded plugin URLs.
+
+A good first layout is:
+
+- TV / Guide
+- iPlayer — Most Popular
+- iPlayer — Highlights
+- iPlayer — Categories
+- iPlayer — Live
+
+The iPlayer WWW add-on currently exposes Live, A-Z, Categories, Most Popular, Highlights, Watching, Favourites and channel listings internally, so those are the useful surfaces to build around.
+
+## 6. Sky-Q-style presentation phase
+
+The data backend is now stable enough that the remaining work is mostly visual and navigational:
+
+1. make **TV / Guide** the dominant home destination;
+2. reduce generic Kodi clutter;
+3. add clean iPlayer rows/widgets;
+4. expose useful channel groups/favourites;
+5. tune artwork, spacing, colours and guide density toward Sky Q;
+6. finish Xbox controller/remote behaviour last.
+
+The exact menu names differ by skin, so the next practical step is to configure from screenshots of the skin's customization screen rather than guessing option names.
+
+## 7. Diagnostics
 
 If the guide is empty or stale, check:
 
@@ -72,28 +106,16 @@ If the guide is empty or stale, check:
 - `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-coverage.txt`
 - `https://raw.githubusercontent.com/n4thyan/iptv/generated/epg-failures.txt`
 
-If those look current and healthy, fully restart Kodi. Only then clear PVR/EPG data and let IPTV Simple import again if necessary.
+If those are healthy, fully restart Kodi before clearing PVR/EPG data.
 
-## 7. Stream failures
+## 8. Stream failures
 
-A blank/failed stream is separate from EPG health. Public IPTV streams can be geo-restricted, temporarily unavailable or require request headers. Do not remove a stream because one probe fails.
+A stream failure is separate from EPG health. Public IPTV/FAST streams can be geo-restricted, temporarily unavailable, rate-limited or dependent on request behaviour.
 
-Use the conservative local validator in `tools/validate_streams.py` when a proper cleanup pass is wanted.
-
-## 8. Kodi presentation / catch-up phase
-
-The data layer is now separate from the UI layer. Current Kodi-side work is:
-
-1. tune the installed Sky/Sky-Q-style skin and guide layout;
-2. arrange channel numbering, groups and favourites;
-3. expose BBC iPlayer inside the main TV / Videos / Movies navigation using the skin's custom menu/widget features where practical;
-4. add other legitimate catch-up services only where they work reliably on Xbox Kodi;
-5. map controller/remote actions so normal viewing feels appliance-like.
-
-BBC iPlayer playback already works; the remaining job is integrating it into the main navigation rather than treating it as an isolated add-on.
+Use `tools/validate_streams.py` for a deliberate cleanup pass rather than deleting a channel after one failed probe.
 
 ## 9. PC maintenance / backup
 
-For actual files such as skin config, keymaps, artwork or backups, use the temporary SMB helper documented in `PC_TO_KODI.md`.
+For skin config, keymaps, artwork or backups, use the temporary SMB helper documented in `PC_TO_KODI.md`.
 
-The PC remains optional for setup and maintenance only. Normal live TV, EPG refreshes and iPlayer playback do not require it to remain online.
+The PC remains optional for setup and maintenance only. Normal live TV, guide refreshes and iPlayer playback do not require it to remain online.
