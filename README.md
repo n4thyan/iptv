@@ -13,6 +13,8 @@ For a UK-only setup use `curated-uk.m3u` instead and keep the same guide URL.
 
 The curated playlist only keeps channels that currently have real programme rows in the generated XMLTV, so Kodi is not filled with thousands of blank guide entries.
 
+The default `guide.xml.gz` is the **Xbox-optimised rolling guide**. It retains all programme-backed channels but trims old/far-future rows to reduce Kodi startup/import work. The untrimmed guide is still published as `guide-full.xml.gz` for desktop/testing use.
+
 ## What is in the main playlist
 
 The build starts with IPTV-org's English-language playlist, filters adult/NSFW entries conservatively, adds useful grouping, and then appends maintained free ad-supported streaming television (FAST) services before the EPG pass.
@@ -42,7 +44,8 @@ The current process is:
 6. rewrite compatible XMLTV IDs to the exact playlist `tvg-id` where required;
 7. de-duplicate programme rows;
 8. create `curated.m3u` and `curated-uk.m3u` containing only channels with programme data;
-9. validate the output before replacing the `generated` branch.
+9. generate both the full XMLTV and a rolling Xbox-optimised XMLTV window;
+10. validate the output before replacing the `generated` branch.
 
 Wrong guide data is considered worse than a missing guide row, so ambiguous matches are rejected rather than guessed.
 
@@ -56,8 +59,10 @@ Published files include:
 - `curated-uk.m3u` — UK-only curated playlist;
 - `english.m3u` — broader English + FAST playlist;
 - `uk.m3u` — broader UK-only playlist;
-- `guide.xml.gz` — shared XMLTV guide;
-- `guide-stats.json`;
+- `guide.xml.gz` — Xbox-optimised rolling XMLTV guide (recommended);
+- `guide-full.xml.gz` — untrimmed XMLTV guide;
+- `guide-stats.json` — full-guide statistics;
+- `xbox-guide-stats.json` — rolling-guide statistics;
 - `epg-coverage.txt`;
 - `epg-failures.txt`;
 - playlist statistics;
@@ -74,6 +79,12 @@ Published files include:
 `.github/workflows/update-generated.yml` runs daily, on relevant changes, and manually through GitHub Actions. It has a 30-minute ceiling and only publishes after regression tests and generated-output checks pass.
 
 A failed build therefore does not intentionally replace the previous known-good generated output.
+
+## Xbox/PVR recovery
+
+Changing an existing Kodi M3U/XMLTV source can leave Kodi's local PVR cache out of sync even when the remote files are valid. After replacing the source URLs, clear Kodi's PVR channel cache and EPG cache once before treating the feed as broken.
+
+The PC helper `tools/kodi-pvr-healthcheck.cmd` can query the Xbox through Kodi JSON-RPC and report the Kodi/IPTV Simple/PVR state without deleting settings. See [`docs/KODI_SETUP.md`](docs/KODI_SETUP.md) for the exact recovery sequence.
 
 ## Stream validation
 
