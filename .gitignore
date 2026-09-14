@@ -4,6 +4,9 @@ vendor/
 __pycache__/
 *.pyc
 
+# Local Kodi helper state (never commit device details)
+tools/.kodi-helper.local.json
+
 # Editor/OS noise
 .vscode/
 .idea/
