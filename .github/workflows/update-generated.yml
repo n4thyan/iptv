@@ -59,12 +59,12 @@ jobs:
           --ids output/uk-channel_ids.txt
           --stats output/uk-playlist-stats.json
 
-      - name: Build fast exact-ID XMLTV guide
+      - name: Build full exact-ID XMLTV guide
         run: >-
           python scripts/build_epg_from_feeds.py
           --ids output/channel_ids.txt
           --sources-file epg-feeds.txt
-          --output output/guide.xml
+          --output output/guide-full.xml
           --stats output/guide-stats.json
           --coverage output/epg-coverage.txt
           --failures output/epg-failures.txt
@@ -75,7 +75,7 @@ jobs:
         run: >-
           python scripts/filter_playlist_by_epg.py
           --playlist output/english.m3u
-          --guide output/guide.xml
+          --guide output/guide-full.xml
           --output output/curated.m3u
           --stats output/curated-playlist-stats.json
 
@@ -83,12 +83,23 @@ jobs:
         run: >-
           python scripts/filter_playlist_by_epg.py
           --playlist output/uk.m3u
-          --guide output/guide.xml
+          --guide output/guide-full.xml
           --output output/curated-uk.m3u
           --stats output/curated-uk-playlist-stats.json
 
-      - name: Compress guide
-        run: gzip -9 -c output/guide.xml > output/guide.xml.gz
+      - name: Build Xbox-optimised rolling XMLTV guide
+        run: >-
+          python scripts/trim_xmltv_window.py
+          --input output/guide-full.xml
+          --output output/guide.xml
+          --stats output/xbox-guide-stats.json
+          --past-hours 3
+          --future-hours 36
+
+      - name: Compress guides
+        run: |
+          gzip -9 -c output/guide.xml > output/guide.xml.gz
+          gzip -9 -c output/guide-full.xml > output/guide-full.xml.gz
 
       - name: Validate generated outputs
         run: |
@@ -97,28 +108,37 @@ jobs:
           test -s output/curated.m3u
           test -s output/curated-uk.m3u
           test -s output/guide.xml.gz
+          test -s output/guide-full.xml.gz
           test -s output/guide-stats.json
+          test -s output/xbox-guide-stats.json
           test -s output/epg-coverage.txt
           grep -q '^#EXTM3U' output/english.m3u
           grep -q '^#EXTM3U' output/curated.m3u
           grep -q 'group-title="[^"]*UK' output/english.m3u
           grep -q 'FAST - Samsung TV Plus' output/english.m3u
           grep -q 'FAST - Pluto TV' output/english.m3u
+          grep -q '<programme ' output/guide-full.xml
           grep -q '<programme ' output/guide.xml
           python - <<'PY'
           import json
           from pathlib import Path
 
           guide = json.loads(Path('output/guide-stats.json').read_text())
+          xbox = json.loads(Path('output/xbox-guide-stats.json').read_text())
           curated = json.loads(Path('output/curated-playlist-stats.json').read_text())
           curated_uk = json.loads(Path('output/curated-uk-playlist-stats.json').read_text())
           if int(guide.get('channels_with_programmes', 0)) < 50:
               raise SystemExit(f"EPG coverage too low: {guide}")
+          if int(xbox.get('output_programmes', 0)) < 1000:
+              raise SystemExit(f"Xbox EPG unexpectedly small: {xbox}")
+          if int(xbox.get('output_programmes', 0)) >= int(xbox.get('input_programmes', 0)):
+              raise SystemExit(f"Xbox EPG was not reduced: {xbox}")
           if int(curated.get('entries_kept', 0)) < 50:
               raise SystemExit(f"curated playlist too small: {curated}")
           if int(curated_uk.get('entries_kept', 0)) < 5:
               raise SystemExit(f"curated UK playlist too small: {curated_uk}")
           print(json.dumps(guide, indent=2))
+          print(json.dumps(xbox, indent=2))
           print(json.dumps(curated, indent=2))
           print(json.dumps(curated_uk, indent=2))
           PY
@@ -131,7 +151,9 @@ jobs:
           cp output/curated.m3u publish/curated.m3u
           cp output/curated-uk.m3u publish/curated-uk.m3u
           cp output/guide.xml.gz publish/guide.xml.gz
+          cp output/guide-full.xml.gz publish/guide-full.xml.gz
           cp output/guide-stats.json publish/guide-stats.json
+          cp output/xbox-guide-stats.json publish/xbox-guide-stats.json
           cp output/epg-coverage.txt publish/epg-coverage.txt
           cp output/epg-failures.txt publish/epg-failures.txt
           cp output/playlist-stats.json publish/playlist-stats.json
@@ -150,6 +172,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add .
-          git commit -m "Refresh Kodi playlist and fast EPG"
+          git commit -m "Refresh Kodi playlist and Xbox-optimised EPG"
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push --force origin generated
