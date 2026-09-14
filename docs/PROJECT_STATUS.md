@@ -37,9 +37,25 @@ Each source receives an extra Kodi group such as `FAST - Samsung TV Plus` while 
 
 Matching service-native XMLTV feeds from `i.mjh.nz` are included in `epg-feeds.txt`, so these channels can survive into `curated.m3u` when real programme rows are present.
 
-## Historical verified checkpoint
+## Current verified build — 2026-09-14
 
-Before FAST integration, the 2026-09-11 verified build contained 352 channels with programme data and 37,738 programme rows. That figure is now historical; use the current `guide-stats.json` and playlist-stat files on the `generated` branch for authoritative live figures.
+The first build with FAST integration completed successfully.
+
+- requested playlist IDs: 3,978
+- curated channels with programme data: 1,300
+- programme rows: 81,342
+- EPG sources configured/downloaded: 23 / 23
+- EPG source failures: 0
+- curated playlist entries kept: 1,300
+
+FAST contributions with exact service-native ID matches included:
+
+- Samsung TV Plus GB: 267 channels / 2,559 programme rows
+- Pluto TV GB: 118 channels / 2,844 programme rows
+- Plex TV GB: 364 channels / 15,706 programme rows
+- Roku: 245 channels / 21,731 programme rows
+
+The earlier 2026-09-11 pre-FAST checkpoint was 352 channels / 37,738 programme rows, so FAST integration materially expanded useful guide coverage without returning to the old slow scraper.
 
 ## Kodi / Xbox UI phase
 
