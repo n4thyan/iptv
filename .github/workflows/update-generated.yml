@@ -41,6 +41,16 @@ jobs:
           python scripts/build_playlist.py
           --extra-group UK=https://iptv-org.github.io/iptv/countries/uk.m3u
 
+      - name: Append free FAST services
+        run: >-
+          python scripts/append_fast_sources.py
+          --playlist output/english.m3u
+          --ids output/channel_ids.txt
+          --source "Samsung TV Plus=https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/samsungtvplus_gb.m3u"
+          --source "Pluto TV=https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plutotv_gb.m3u"
+          --source "Plex TV=https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/plex_gb.m3u"
+          --source "Roku Channel=https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/main/playlists/roku_all.m3u"
+
       - name: Build cleaned UK playlist
         run: >-
           python scripts/build_playlist.py
@@ -92,6 +102,8 @@ jobs:
           grep -q '^#EXTM3U' output/english.m3u
           grep -q '^#EXTM3U' output/curated.m3u
           grep -q 'group-title="[^"]*UK' output/english.m3u
+          grep -q 'FAST - Samsung TV Plus' output/english.m3u
+          grep -q 'FAST - Pluto TV' output/english.m3u
           grep -q '<programme ' output/guide.xml
           python - <<'PY'
           import json
